@@ -1,0 +1,13 @@
+[project]
+name = "comsoc-project"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "ipykernel>=6.29.5",
+    "matplotlib>=3.9.2",
+    "pkg-resources",
+    "pref-voting>=1.14.17",
+    "pysat>=3.2.1",
+]
