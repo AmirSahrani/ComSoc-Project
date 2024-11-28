@@ -12,7 +12,6 @@ In this repository we run simulations on different voting rules, using various n
 | Nietzschean | Maximize the the utility of the most happy player|
 
 ## Running the code
----
 This project uses `uv` for its package management, but a `requirements.txt` file is also provided.
 
 To run this projuect using `uv`:
@@ -29,6 +28,7 @@ Then simply run:
 python src/main.py
 ```
 
+Figures will be shown and saved in `/figures/`
+
 ## References
----
 ...
