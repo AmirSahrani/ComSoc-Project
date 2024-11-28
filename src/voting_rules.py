@@ -15,14 +15,14 @@ def utilitarian_optimal(profile):
     """
     return utilities_to_np(profile).sum(axis=0).argmax()
 
-def sen_optimal(profile):
-    """
-    Returns the optimal winner, such that the sum of utilities and the gini-index are maximized
-    """
-    pass
-
 
 def nietzschean_optimal(profile):
+    """
+    Returns the optimal winner, such that the utility of any individual voter is maximized
+    """
+    return np.argmax(np.max(profile, axis=0))
+
+def rawlsian_optimal(profile):
     """
     Returns the optimal winner, such that the utility of any individual voter is maximized
     """

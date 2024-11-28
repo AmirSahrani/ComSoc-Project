@@ -1,18 +1,19 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from voting_rules import utilitarian_optimal, utilities_to_np
+from pref_voting.c1_methods import copeland
+from prefsampling.point.ball import Callable
+from voting_rules import utilitarian_optimal, nietzschean_optimal, utilities_to_np
 from pref_voting import voting_methods as vr
 from pref_voting import generate_profiles as gp
 from pref_voting import generate_utility_profiles as gup
-import multiprocessing as mp
-import decorators as dec
 
-## TODO make decotaror for the voting rules so that you don't have to use lambda functions
-
-
+def vr_wrapper(vr_rule):
+    def rule(x):
+        return vr_rule(x)[0] -1
+    return rule
 
 plt.rcParams.update({
-    'font.size': 13,
+    'font.size': 14,
     'axes.labelsize': 13,
     'axes.titlesize': 13,
     'xtick.labelsize': 11,
@@ -22,22 +23,25 @@ plt.rcParams.update({
     'grid.linewidth': 1,
     'grid.alpha': 0.3,
     'image.cmap': 'viridis',
-    'text.usetex': True
+    'text.usetex': True,
+    'font.family': 'Computer Modern'
 })
 
 
-
 class VotingGame():
-    def __init__(self, n, m, k=None, min_util=0, max_util=1) -> None:
-        self.n = n
-        self.m = m
-        self.max_util = max_util
-        self.min_util = min_util
-        self.k = k
-        self.utils = np.ndarray([])
-        self.utility_profile = self.generate_random_profile()
+    def __init__(self, n, m, rule, optimal_rule, k=None, min_util=0, max_util=1) -> None:
+        self.n: int = n
+        self.m: int = m
+        self.max_util: float = max_util
+        self.min_util: float = min_util
+        self.rule: Callable = rule
+        self.optimal_rule: Callable = optimal_rule
+        self.k: float | None = k
+        self.utils: np.ndarray = np.ndarray([])
+        self.utility_profile  = self.generate_random_profile()
         self.linear_profile = gp.Profile([np.argsort(-self.utils[v]) for v in range(self.n)], [1] * self.n)
 
+        # Assertions to ensure profiles have been properly generated
         assert self.linear_profile.num_cands == self.m, f'num_candidates: {self.linear_profile.num_cands}, m: {self.m}\n profile: {self.linear_profile}'
         assert self.linear_profile.num_voters == self.n, f'num_voters: {self.linear_profile.num_voters}, n: {self.n}'
         assert self.utility_profile.num_cands == self.m, f'num_candidates: {self.utility_profile.num_cands}, m: {self.m}\n profile: {self.utility_profile.display()}'
@@ -54,36 +58,35 @@ class VotingGame():
                                 for voter in range(self.n)])
         return uprofs
 
-    def get_winner(self, rule) -> int:
-        winner = rule(self.linear_profile)
+    def get_winner(self) -> int:
+        winner = self.rule(self.linear_profile)
         assert winner < self.m, f'winner: {winner}, m: {self.m}\nprofile: {self.linear_profile}'
         return winner
 
-    def get_winner_opt(self, rule) -> int:
-        winner = rule(self.utility_profile)
+    def get_winner_opt(self) -> int:
+        winner = self.optimal_rule(self.utility_profile)
         assert winner < self.m, f'winner: {winner}, m: {self.m}\nprofile: {self.utility_profile.display()}'
         return winner
 
     def get_utility(self, winners) -> np.ndarray:
         return self.utils[:, winners]
 
-    def distortion(self, rule, optimal_rule) -> float:
-        rule_winner = self.get_winner(rule)
-        opt_winner = self.get_winner_opt(optimal_rule)
+    def distortion(self) -> float:
+        rule_winner = self.get_winner()
+        opt_winner = self.get_winner_opt()
         return self.get_utility(opt_winner).sum() /self.get_utility(rule_winner).sum() if self.get_utility(rule_winner).sum() > 0 else np.inf
 
-def trails(n, m, k, min_util, max_util, rule, optimal_rule, num_trails):
+
+def trails(kwargs, num_trails):
     distortions = []
-    with mp.Pool(mp.cpu_count()) as pool:
-        games = [VotingGame(n, m, k, min_util, max_util) for _ in range(num_trails)]
-        distortions = pool.starmap(VotingGame.distortion, [(game, rule, optimal_rule) for game in games])
+    for _ in range(num_trails):
+        distortions.append(VotingGame(**kwargs).distortion())
     return distortions
 
 
 def plot_distortions(distortions, title, xlabel, ylabel, n_vals, m_vals):
     var_distortions = np.var(distortions, axis=2)
     mean_distortions = np.mean(distortions, axis=2)
-    # find distortion in the limit
     limit = mean_distortions[-3:, :].mean()
 
 
@@ -97,39 +100,72 @@ def plot_distortions(distortions, title, xlabel, ylabel, n_vals, m_vals):
                         mean_distortions[:, m] + var_distortions[:, m],
                         color=colors[m], alpha=0.2)
     plt.axhline(limit, color='gray', linestyle='--', alpha=0.5)
-    plt.text(n_vals[-5], limit + 0.5, f'Distortion converging to {limit:.2f}', color='Black', fontsize=12)
+    # plt.text(n_vals[-5], limit + 0.5, f'Distortion converging to {limit:.2f}', color='Black', fontsize=12)
     plt.title(title)
+    plt.ylim((0, 20))
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
-    plt.savefig(f'../figures/{title}.png')
+    plt.savefig(f'figures/{title}.png')
     plt.show()
 
 
 def evaluate_rule(rule, optimal_rule, n_vals, m_vals, num_trails):
+    '''
+    Evalute the distortion of a voting rule (`rule`) against a rule that maximizes the social welfare (`optimal_rule`)
+
+    args:
+        rule: rule to be evaluated
+        optimal_rule: rule that maximizes social welfare
+        n_vals: The values for the number of voters to be tested
+        m_vals: The values for the number of candidates to be tested
+        num_trails: The number of trials ran for each setting
+
+    returns:
+        distortions: ND-array of shape (len(n_vals), len(m_vals), num_trails) containign the distortion of each run
+    '''
     distortions = np.empty((len(n_vals), len(m_vals), num_trails))
     for i,n in enumerate(n_vals):
         for j,m in enumerate(m_vals):
-            k = 10
-            min_util = 0
-            max_util = 1
-            distortions[i,j] = trails(n, m, k, min_util, max_util, rule, optimal_rule, num_trails)
+            kwargs = {
+                "n": m,
+                "m": m,
+                'k': 1,
+                'rule': rule,
+                'optimal_rule': optimal_rule,
+                'min_util': 0,
+                'max_util': 1,
+            }
+            distortions[i,j] = trails(kwargs, num_trails)
     return distortions
+
 
 def main():
     n_vals = range(2, 100, 5)
     m_vals = range(2, 25, 5)
-    n_trails = 10
-    borda_distortion = evaluate_rule(lambda x: vr.borda(x)[0] -1, utilitarian_optimal, n_vals, m_vals, n_trails)
-    plot_distortions(borda_distortion, 'Distortion of the Borda rule', 'Number of voters', 'Distortion', n_vals, m_vals)
-    # plurarity_distortion = evaluate_rule(lambda x: vr.plurality(x)[0] -1, utilitarian_optimal, n_vals, m_vals, n_trails)
-    # plot_distortions(plurarity_distortion, 'Distortion of the Plurality rule', 'Number of voters', 'Distortion', n_vals, m_vals)
+    n_trails = 300
+    borda_distortion_utilitarian = evaluate_rule(vr_wrapper(vr.borda), utilitarian_optimal, n_vals, m_vals, n_trails)
+    plurarity_distortion_utilitarian = evaluate_rule(vr_wrapper(vr.plurality), utilitarian_optimal, n_vals, m_vals, n_trails)
+    copeland_distortion_utilitarian = evaluate_rule(vr_wrapper(vr.copeland), utilitarian_optimal, n_vals, m_vals, n_trails)
+    black_distortion_utilitarian = evaluate_rule(vr_wrapper(vr.blacks), utilitarian_optimal, n_vals, m_vals, n_trails)
+
+    borda_distortion_nietz = evaluate_rule(vr_wrapper(vr.borda), nietzschean_optimal , n_vals, m_vals, n_trails)
+    plurarity_distortion_nietz = evaluate_rule(vr_wrapper(vr.plurality), nietzschean_optimal, n_vals, m_vals, n_trails)
+    copeland_distortion_nietz = evaluate_rule(vr_wrapper(vr.copeland), nietzschean_optimal, n_vals, m_vals, n_trails)
+    black_distortion_nietz = evaluate_rule(vr_wrapper(vr.blacks), nietzschean_optimal, n_vals, m_vals, n_trails)
 
 
+    plot_distortions(borda_distortion_nietz, 'Distortion of the Borda rule, Nietzschean', 'Number of voters', 'Distortion', n_vals, m_vals)
+    plot_distortions(plurarity_distortion_nietz, 'Distortion of the rule, Nietzschean', 'Number of voters', 'Distortion', n_vals, m_vals)
+    plot_distortions(copeland_distortion_nietz, 'Distortion of the Borda rule, Nietzschean', 'Number of voters', 'Distortion', n_vals, m_vals)
+    plot_distortions(black_distortion_nietz, 'Distortion of the Borda rule, Nietzschean', 'Number of voters', 'Distortion', n_vals, m_vals)
 
-
+    plot_distortions(borda_distortion_utilitarian, 'Distortion of the Borda rule, Utilitarian', 'Number of voters', 'Distortion', n_vals, m_vals)
+    plot_distortions(plurarity_distortion_utilitarian, 'Distortion of the Plurality rule, Utilitarian', 'Number of voters', 'Distortion', n_vals, m_vals)
+    plot_distortions(copeland_distortion_utilitarian, 'Distortion of Copeland\'s rule, Utilitarian', 'Number of voters', 'Distortion', n_vals, m_vals)
+    plot_distortions(black_distortion_utilitarian, 'Distortion of Black\'s rule, Utilitarian', 'Number of voters', 'Distortion', n_vals, m_vals)
 
 if __name__ == "__main__":
     main()
