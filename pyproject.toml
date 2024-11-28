@@ -5,8 +5,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "ipykernel>=6.29.5",
     "matplotlib>=3.9.2",
-    "pref-voting>=1.14.17",
-    "pysat>=3.2.1",
+    "numba>=0.60.0",
+    "numpy>=2.0.2",
+    "pref-voting>=1.14.18",
+    "setuptools>=75.6.0",
 ]
