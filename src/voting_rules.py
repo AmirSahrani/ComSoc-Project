@@ -18,12 +18,12 @@ def utilitarian_optimal(profile):
 
 def nietzschean_optimal(profile):
     """
-    Returns the optimal winner, such that the utility of any individual voter is maximized
+    Returns the optimal winner, such that the utility of least happy voter is maximized
     """
-    return np.argmax(np.max(profile, axis=0))
+    return np.argmax(np.max(utilities_to_np(profile), axis=0))
 
 def rawlsian_optimal(profile):
     """
     Returns the optimal winner, such that the utility of any individual voter is maximized
     """
-    return np.argmax(np.max(profile, axis=0))
+    return np.argmax(np.min(utilities_to_np(profile), axis=0))

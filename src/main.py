@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pref_voting.c1_methods import copeland
 from prefsampling.point.ball import Callable
-from voting_rules import utilitarian_optimal, nietzschean_optimal, utilities_to_np
+from voting_rules import utilitarian_optimal, nietzschean_optimal, rawlsian_optimal
 from pref_voting import voting_methods as vr
 from pref_voting import generate_profiles as gp
 from pref_voting import generate_utility_profiles as gup
@@ -91,7 +91,7 @@ def plot_distortions(distortions, title, xlabel, ylabel, n_vals, m_vals):
 
 
     plt.figure()
-    colors = plt.cm.get_cmap("viridis")(np.linspace(0, 1, mean_distortions.shape[1]))
+    colors = plt.get_cmap("viridis")(np.linspace(0, 1, mean_distortions.shape[1]))
 
     for m in range(mean_distortions.shape[1]):
         plt.plot(n_vals, mean_distortions[:, m], color=colors[m], label=f'm={m_vals[m]}')
@@ -156,11 +156,20 @@ def main():
     copeland_distortion_nietz = evaluate_rule(vr_wrapper(vr.copeland), nietzschean_optimal, n_vals, m_vals, n_trails)
     black_distortion_nietz = evaluate_rule(vr_wrapper(vr.blacks), nietzschean_optimal, n_vals, m_vals, n_trails)
 
+    borda_distortion_rawlsian= evaluate_rule(vr_wrapper(vr.borda), rawlsian_optimal, n_vals, m_vals, n_trails)
+    plurarity_distortion_rawlsian = evaluate_rule(vr_wrapper(vr.plurality), rawlsian_optimal, n_vals, m_vals, n_trails)
+    copeland_distortion_rawlsian = evaluate_rule(vr_wrapper(vr.copeland), rawlsian_optimal, n_vals, m_vals, n_trails)
+    black_distortion_rawlsian = evaluate_rule(vr_wrapper(vr.blacks), rawlsian_optimal, n_vals, m_vals, n_trails)
+
+    plot_distortions(borda_distortion_rawlsian, 'Distortion of the Borda rule, rawlsian', 'Number of voters', 'Distortion', n_vals, m_vals)
+    plot_distortions(plurarity_distortion_rawlsian, 'Distortion of the Plurality rule, rawlsian', 'Number of voters', 'Distortion', n_vals, m_vals)
+    plot_distortions(copeland_distortion_rawlsian, 'Distortion of Copelands\' rule, rawlsian', 'Number of voters', 'Distortion', n_vals, m_vals)
+    plot_distortions(black_distortion_rawlsian, 'Distortion of Blacks\' rule, rawlsian', 'Number of voters', 'Distortion', n_vals, m_vals)
 
     plot_distortions(borda_distortion_nietz, 'Distortion of the Borda rule, Nietzschean', 'Number of voters', 'Distortion', n_vals, m_vals)
-    plot_distortions(plurarity_distortion_nietz, 'Distortion of the rule, Nietzschean', 'Number of voters', 'Distortion', n_vals, m_vals)
-    plot_distortions(copeland_distortion_nietz, 'Distortion of the Borda rule, Nietzschean', 'Number of voters', 'Distortion', n_vals, m_vals)
-    plot_distortions(black_distortion_nietz, 'Distortion of the Borda rule, Nietzschean', 'Number of voters', 'Distortion', n_vals, m_vals)
+    plot_distortions(plurarity_distortion_nietz, 'Distortion of the Plurality rule, Nietzschean', 'Number of voters', 'Distortion', n_vals, m_vals)
+    plot_distortions(copeland_distortion_nietz, 'Distortion of Copelands\' rule, Nietzschean', 'Number of voters', 'Distortion', n_vals, m_vals)
+    plot_distortions(black_distortion_nietz, 'Distortion of Blacks\' rule, Nietzschean', 'Number of voters', 'Distortion', n_vals, m_vals)
 
     plot_distortions(borda_distortion_utilitarian, 'Distortion of the Borda rule, Utilitarian', 'Number of voters', 'Distortion', n_vals, m_vals)
     plot_distortions(plurarity_distortion_utilitarian, 'Distortion of the Plurality rule, Utilitarian', 'Number of voters', 'Distortion', n_vals, m_vals)
