@@ -1,11 +1,16 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from pref_voting.c1_methods import copeland
-from prefsampling.point.ball import Callable
-from voting_rules import utilitarian_optimal, nietzschean_optimal, rawlsian_optimal
-from pref_voting import voting_methods as vr
 from pref_voting import generate_profiles as gp
 from pref_voting import generate_utility_profiles as gup
+from pref_voting import voting_methods as vr
+from prefsampling.point.ball import Callable
+
+from voting_rules import (
+    nash_optimal,
+    nietzschean_optimal,
+    rawlsian_optimal,
+    utilitarian_optimal,
+)
 
 
 def vr_wrapper(vr_rule):
@@ -34,16 +39,14 @@ plt.rcParams.update(
 
 
 class VotingGame:
-    def __init__(
-        self, n, m, rule, optimal_rule, k=None, min_util=0, max_util=1
-    ) -> None:
+    def __init__(self, n, m, rule, optimal_rule, k=1, min_util=0, max_util=1) -> None:
         self.n: int = n
         self.m: int = m
         self.max_util: float = max_util
         self.min_util: float = min_util
         self.rule: Callable = rule
         self.optimal_rule: Callable = optimal_rule
-        self.k: float | None = k
+        self.k: int = k * m
         self.utils: np.ndarray = np.ndarray([])
         self.utility_profile = self.generate_random_profile()
         self.linear_profile = gp.Profile(
@@ -65,10 +68,9 @@ class VotingGame:
         ), f"num_voters: {self.utility_profile.num_voters}, n: {self.n}"
 
     def generate_random_profile(self) -> gup.UtilityProfile:
-        utils = np.random.uniform(size=(self.m, self.n))
-        if self.k:
-            for voter in range(self.n):
-                utils[:, voter] *= self.k / np.sum(utils[:, voter])
+        utils = np.array(
+            [generate_random_sum_k_utilities(self.m, self.k) for _ in range(self.n)]
+        ).T
         self.utils = utils.T
         uprofs = gup.UtilityProfile(
             [
@@ -99,11 +101,20 @@ class VotingGame:
         rule_winner = self.get_winner()
         opt_winner = self.get_winner_opt()
         return (
-            self.get_utility(opt_winner).sum() /
-            self.get_utility(rule_winner).sum()
+            self.get_utility(opt_winner).sum() / self.get_utility(rule_winner).sum()
             if self.get_utility(rule_winner).sum() > 0
-            else np.inf
+            else 1000
         )
+
+
+def generate_random_sum_k_utilities(m, k):
+    assert k >= m
+    first = np.random.randint(0, k, m - 1)
+    first = np.sort(first)
+    second = np.diff(np.concatenate(([0], first, [k])))
+    assert len(second) == m, f"len: {len(second)}, m: {m}, k: {k}"
+    assert second.sum() == k, f"sum: {second.sum()}, k: {k}"
+    return second
 
 
 def trails(kwargs, num_trails):
@@ -113,19 +124,17 @@ def trails(kwargs, num_trails):
     return distortions
 
 
-def plot_distortions(distortions, title, xlabel, ylabel, n_vals, m_vals):
+def plot_distortions(distortions, title, xlabel, ylabel, n_vals, m_vals, show=True):
     var_distortions = np.var(distortions, axis=2)
     mean_distortions = np.mean(distortions, axis=2)
     limit = mean_distortions[-3:, :].mean()
 
     plt.figure()
-    colors = plt.get_cmap("viridis")(
-        np.linspace(0, 1, mean_distortions.shape[1]))
+    colors = plt.get_cmap("viridis")(np.linspace(0, 1, mean_distortions.shape[1]))
 
     for m in range(mean_distortions.shape[1]):
         plt.plot(
-            n_vals, mean_distortions[:,
-                                     m], color=colors[m], label=f"m={m_vals[m]}"
+            n_vals, mean_distortions[:, m], color=colors[m], label=f"m={m_vals[m]}"
         )
         plt.fill_between(
             n_vals,
@@ -134,17 +143,17 @@ def plot_distortions(distortions, title, xlabel, ylabel, n_vals, m_vals):
             color=colors[m],
             alpha=0.2,
         )
-    plt.axhline(limit, color="gray", linestyle="--", alpha=0.5)
-    # plt.text(n_vals[-5], limit + 0.5, f'Distortion converging to {limit:.2f}', color='Black', fontsize=12)
+
     plt.title(title)
-    plt.ylim((0, 20))
+    plt.ylim((0, 8))
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.grid(True)
-    plt.legend()
+    plt.legend(loc="upper right")
     plt.tight_layout()
-    plt.savefig(f"figures/{title}.png")
-    plt.show()
+    plt.savefig(f"figures/{title}.svg")
+    if show:
+        plt.show()
 
 
 def evaluate_rule(rule, optimal_rule, n_vals, m_vals, num_trails):
@@ -167,7 +176,7 @@ def evaluate_rule(rule, optimal_rule, n_vals, m_vals, num_trails):
             kwargs = {
                 "n": m,
                 "m": m,
-                "k": 1,
+                "k": 3,
                 "rule": rule,
                 "optimal_rule": optimal_rule,
                 "min_util": 0,
@@ -179,133 +188,44 @@ def evaluate_rule(rule, optimal_rule, n_vals, m_vals, num_trails):
 
 def main():
     n_vals = range(2, 100, 5)
-    m_vals = range(2, 25, 5)
-    n_trails = 300
-    borda_distortion_utilitarian = evaluate_rule(
-        vr_wrapper(vr.borda), utilitarian_optimal, n_vals, m_vals, n_trails )
-    plurarity_distortion_utilitarian = evaluate_rule(
-        vr_wrapper(vr.plurality), utilitarian_optimal, n_vals, m_vals, n_trails )
-    copeland_distortion_utilitarian = evaluate_rule(
-        vr_wrapper(vr.copeland), utilitarian_optimal, n_vals, m_vals, n_trails )
-    black_distortion_utilitarian = evaluate_rule(
-        vr_wrapper(vr.blacks), utilitarian_optimal, n_vals, m_vals, n_trails )
+    m_vals = range(5, 25, 5)
+    n_trails = 1
+    borda_rule = {"rule": vr.borda, "name": "the Borda rule"}
+    copeland_rule = {"rule": vr.copeland, "name": "Copeland's Rule"}
+    plurality_rule = {"rule": vr.plurality, "name": "the Plurality rule"}
+    blacks_rule = {"rule": vr.blacks, "name": "Black's Rule"}
 
-    borda_distortion_nietz = evaluate_rule(
-        vr_wrapper(vr.borda), nietzschean_optimal, n_vals, m_vals, n_trails )
-    plurarity_distortion_nietz = evaluate_rule(
-        vr_wrapper(vr.plurality), nietzschean_optimal, n_vals, m_vals, n_trails )
-    copeland_distortion_nietz = evaluate_rule(
-        vr_wrapper(vr.copeland), nietzschean_optimal, n_vals, m_vals, n_trails )
-    black_distortion_nietz = evaluate_rule(
-        vr_wrapper(vr.blacks), nietzschean_optimal, n_vals, m_vals, n_trails )
+    voting_rules = [borda_rule, copeland_rule, plurality_rule, blacks_rule]
 
-    borda_distortion_rawlsian = evaluate_rule(
-        vr_wrapper(vr.borda), rawlsian_optimal, n_vals, m_vals, n_trails )
-    plurarity_distortion_rawlsian = evaluate_rule(
-        vr_wrapper(vr.plurality), rawlsian_optimal, n_vals, m_vals, n_trails )
-    copeland_distortion_rawlsian = evaluate_rule(
-        vr_wrapper(vr.copeland), rawlsian_optimal, n_vals, m_vals, n_trails )
-    black_distortion_rawlsian = evaluate_rule(
-        vr_wrapper(vr.blacks), rawlsian_optimal, n_vals, m_vals, n_trails )
+    nash_rule = {"rule": nash_optimal, "name": "Nash"}
+    utilitarian_rule = {"rule": utilitarian_optimal, "name": "Utiliratian"}
+    rawlsian_rule = {"rule": rawlsian_optimal, "name": "Rawlsian"}
+    nietz_rule = {"rule": nietzschean_optimal, "name": "Nietzschean"}
 
-    plot_distortions(
-        borda_distortion_rawlsian,
-        "Distortion of the Borda rule, rawlsian",
-        "Number of voters",
-        "Distortion",
-        n_vals,
-        m_vals,
-    )
-    plot_distortions(
-        plurarity_distortion_rawlsian,
-        "Distortion of the Plurality rule, rawlsian",
-        "Number of voters",
-        "Distortion",
-        n_vals,
-        m_vals,
-    )
-    plot_distortions(
-        copeland_distortion_rawlsian,
-        "Distortion of Copelands' rule, rawlsian",
-        "Number of voters",
-        "Distortion",
-        n_vals,
-        m_vals,
-    )
-    plot_distortions(
-        black_distortion_rawlsian,
-        "Distortion of Blacks' rule, rawlsian",
-        "Number of voters",
-        "Distortion",
-        n_vals,
-        m_vals,
-    )
+    socialwelfare_rules = [nash_rule, utilitarian_rule, rawlsian_rule, nietz_rule]
 
-    plot_distortions(
-        borda_distortion_nietz,
-        "Distortion of the Borda rule, Nietzschean",
-        "Number of voters",
-        "Distortion",
-        n_vals,
-        m_vals,
-    )
-    plot_distortions(
-        plurarity_distortion_nietz,
-        "Distortion of the Plurality rule, Nietzschean",
-        "Number of voters",
-        "Distortion",
-        n_vals,
-        m_vals,
-    )
-    plot_distortions(
-        copeland_distortion_nietz,
-        "Distortion of Copelands' rule, Nietzschean",
-        "Number of voters",
-        "Distortion",
-        n_vals,
-        m_vals,
-    )
-    plot_distortions(
-        black_distortion_nietz,
-        "Distortion of Blacks' rule, Nietzschean",
-        "Number of voters",
-        "Distortion",
-        n_vals,
-        m_vals,
-    )
+    results = {}
+    for voting_rule in voting_rules:
+        for sw in socialwelfare_rules:
+            results[voting_rule["name"] + sw["name"]] = evaluate_rule(
+                vr_wrapper(voting_rule["rule"]),
+                sw["rule"],
+                n_vals,
+                m_vals,
+                n_trails,
+            )
 
-    plot_distortions(
-        borda_distortion_utilitarian,
-        "Distortion of the Borda rule, Utilitarian",
-        "Number of voters",
-        "Distortion",
-        n_vals,
-        m_vals,
-    )
-    plot_distortions(
-        plurarity_distortion_utilitarian,
-        "Distortion of the Plurality rule, Utilitarian",
-        "Number of voters",
-        "Distortion",
-        n_vals,
-        m_vals,
-    )
-    plot_distortions(
-        copeland_distortion_utilitarian,
-        "Distortion of Copeland's rule, Utilitarian",
-        "Number of voters",
-        "Distortion",
-        n_vals,
-        m_vals,
-    )
-    plot_distortions(
-        black_distortion_utilitarian,
-        "Distortion of Black's rule, Utilitarian",
-        "Number of voters",
-        "Distortion",
-        n_vals,
-        m_vals,
-    )
+    for voting_rule in voting_rules:
+        for sw in socialwelfare_rules:
+            plot_distortions(
+                results[voting_rule["name"] + sw["name"]],
+                f"Distortion of {voting_rule['name'] }, {sw['name']}",
+                "Number of voters",
+                "Distortion",
+                n_vals,
+                m_vals,
+                show=False,
+            )
 
 
 if __name__ == "__main__":
