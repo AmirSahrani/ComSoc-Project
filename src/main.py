@@ -1,9 +1,10 @@
+from typing import Callable, Iterable
+
 import matplotlib.pyplot as plt
 import numpy as np
 from pref_voting import generate_profiles as gp
 from pref_voting import generate_utility_profiles as gup
 from pref_voting import voting_methods as vr
-from prefsampling.point.ball import Callable
 
 from voting_rules import (
     nash_optimal,
@@ -107,7 +108,7 @@ class VotingGame:
         )
 
 
-def generate_random_sum_k_utilities(m, k):
+def generate_random_sum_k_utilities(m: int, k: int):
     assert k >= m
     first = np.random.randint(0, k, m - 1)
     first = np.sort(first)
@@ -117,14 +118,22 @@ def generate_random_sum_k_utilities(m, k):
     return second
 
 
-def trails(kwargs, num_trails):
+def trails(kwargs: dict, num_trails: int):
     distortions = []
     for _ in range(num_trails):
         distortions.append(VotingGame(**kwargs).distortion())
     return distortions
 
 
-def plot_distortions(distortions, title, xlabel, ylabel, n_vals, m_vals, show=True):
+def plot_distortions(
+    distortions: np.ndarray,
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    n_vals: Iterable[int] | range,
+    m_vals: Iterable[int] | range,
+    show: bool = True,
+):
     var_distortions = np.var(distortions, axis=2)
     mean_distortions = np.mean(distortions, axis=2)
     limit = mean_distortions[-3:, :].mean()
@@ -156,7 +165,13 @@ def plot_distortions(distortions, title, xlabel, ylabel, n_vals, m_vals, show=Tr
         plt.show()
 
 
-def evaluate_rule(rule, optimal_rule, n_vals, m_vals, num_trails):
+def evaluate_rule(
+    rule: Callable,
+    optimal_rule: Callable,
+    n_vals: Iterable[int] | range,
+    m_vals: Iterable[int] | range,
+    num_trails: int,
+):
     """
     Evalute the distortion of a voting rule (`rule`) against a rule that maximizes the social welfare (`optimal_rule`)
 
