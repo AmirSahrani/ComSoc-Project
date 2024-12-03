@@ -2,6 +2,7 @@ from typing import Callable
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from pref_voting import generate_profiles as gp
 from pref_voting import generate_utility_profiles as gup
 from pref_voting import voting_methods as vr
@@ -205,11 +206,16 @@ def evaluate_rule(
             distortions[i, j] = trails(kwargs, num_trails)
     return distortions
 
+def save_results(results: dict):
+    df = pd.DataFrame(results)
+    print(f"Saving Results: {df.head()}")
+    df.to_csv("data/results.csv")
+    print("Results saved to data/results.csv")
 
 def main():
     n_vals = range(2, 100, 5)
     m_vals = range(5, 25, 5)
-    n_trails = 1
+    n_trails = 300
     borda_rule = {"rule": vr.borda, "name": "the Borda rule"}
     copeland_rule = {"rule": vr.copeland, "name": "Copeland's Rule"}
     plurality_rule = {"rule": vr.plurality, "name": "the Plurality rule"}
@@ -225,6 +231,7 @@ def main():
     socialwelfare_rules = [nash_rule, utilitarian_rule, rawlsian_rule, nietz_rule]
 
     results = {}
+    np.random.seed(1)
     for voting_rule in voting_rules:
         for sw in socialwelfare_rules:
             results[voting_rule["name"] + sw["name"]] = evaluate_rule(
@@ -234,6 +241,8 @@ def main():
                 m_vals,
                 n_trails,
             )
+
+    save_results(results)
 
     for voting_rule in voting_rules:
         for sw in socialwelfare_rules:

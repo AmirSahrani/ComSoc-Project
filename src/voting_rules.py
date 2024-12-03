@@ -19,7 +19,9 @@ def nash_optimal(profile):
     """
     Returns the optimal winner, such that the sum of the utilities of the voters is maximized.
     """
-    return utilities_to_np(profile).prod(axis=0).argmax()
+    profile = utilities_to_np(profile)
+    m = profile.shape[1]
+    return np.pow(profile, 1/m).prod(axis=0).argmax()
 
 def nietzschean_optimal(profile):
     """
