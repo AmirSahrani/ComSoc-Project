@@ -1,4 +1,4 @@
-from typing import Callable, Iterable
+from typing import Callable
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -108,13 +108,18 @@ class VotingGame:
         )
 
 
-def generate_random_sum_k_utilities(m: int, k: int):
+def generate_random_sum_k_utilities(
+    m: int, k: int, linear_pref: np.ndarray | None = None
+):
     assert k >= m
     first = np.random.randint(0, k, m - 1)
     first = np.sort(first)
     second = np.diff(np.concatenate(([0], first, [k])))
     assert len(second) == m, f"len: {len(second)}, m: {m}, k: {k}"
     assert second.sum() == k, f"sum: {second.sum()}, k: {k}"
+    if linear_pref is not None:
+        order = np.argsort(linear_pref)
+        return second[order]
     return second
 
 
@@ -130,8 +135,8 @@ def plot_distortions(
     title: str,
     xlabel: str,
     ylabel: str,
-    n_vals: Iterable[int] | range,
-    m_vals: Iterable[int] | range,
+    n_vals: list[int] | range,
+    m_vals: list[int] | range,
     show: bool = True,
 ):
     var_distortions = np.var(distortions, axis=2)
@@ -168,8 +173,8 @@ def plot_distortions(
 def evaluate_rule(
     rule: Callable,
     optimal_rule: Callable,
-    n_vals: Iterable[int] | range,
-    m_vals: Iterable[int] | range,
+    n_vals: list[int] | range,
+    m_vals: list[int] | range,
     num_trails: int,
 ):
     """
