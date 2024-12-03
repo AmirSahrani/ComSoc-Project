@@ -6,6 +6,7 @@ import pandas as pd
 from pref_voting import generate_profiles as gp
 from pref_voting import generate_utility_profiles as gup
 from pref_voting import voting_methods as vr
+from tabulate import Line
 
 from voting_rules import (
     nash_optimal,
@@ -41,7 +42,7 @@ plt.rcParams.update(
 
 
 class VotingGame:
-    def __init__(self, n, m, rule, optimal_rule, k=1, min_util=0, max_util=1) -> None:
+    def __init__(self, n, m, rule, optimal_rule, k=1, min_util=0, max_util=1, linear_profile: None | gp.Profile = None) -> None:
         self.n: int = n
         self.m: int = m
         self.max_util: float = max_util
@@ -49,11 +50,16 @@ class VotingGame:
         self.rule: Callable = rule
         self.optimal_rule: Callable = optimal_rule
         self.k: int = k * m
-        self.utils: np.ndarray = np.ndarray([])
-        self.utility_profile = self.generate_random_profile()
-        self.linear_profile = gp.Profile(
-            [np.argsort(-self.utils[v]) for v in range(self.n)], [1] * self.n
-        )
+        if linear_profile is not None:
+            self.utils: np.ndarray = np.ndarray([])
+            self.linear_profile = linear_profile
+            self.utility_profile = self.generate_random_profile_from(np.array(linear_profile.rankings))
+        else:
+            self.utils: np.ndarray = np.ndarray([])
+            self.utility_profile = self.generate_random_profile()
+            self.linear_profile = gp.Profile(
+                [np.argsort(-self.utils[v]) for v in range(self.n)], [1] * self.n
+            )
 
         # Assertions to ensure profiles have been properly generated
         assert (
@@ -72,6 +78,19 @@ class VotingGame:
     def generate_random_profile(self) -> gup.UtilityProfile:
         utils = np.array(
             [generate_random_sum_k_utilities(self.m, self.k) for _ in range(self.n)]
+        ).T
+        self.utils = utils.T
+        uprofs = gup.UtilityProfile(
+            [
+                {cand: utils[cand][voter] for cand in range(self.m)}
+                for voter in range(self.n)
+            ]
+        )
+        return uprofs
+    def generate_random_profile_from(self, profile) -> gup.UtilityProfile:
+
+        utils = np.array(
+            [generate_random_sum_k_utilities(self.m, self.k, profile[i, :]) for i in range(self.n)]
         ).T
         self.utils = utils.T
         uprofs = gup.UtilityProfile(
@@ -113,15 +132,15 @@ def generate_random_sum_k_utilities(
     m: int, k: int, linear_pref: np.ndarray | None = None
 ):
     assert k >= m
-    first = np.random.randint(0, k, m - 1)
-    first = np.sort(first)
-    second = np.diff(np.concatenate(([0], first, [k])))
-    assert len(second) == m, f"len: {len(second)}, m: {m}, k: {k}"
-    assert second.sum() == k, f"sum: {second.sum()}, k: {k}"
+    random_values = np.random.randint(0, k, m - 1)
+    random_values = np.sort(random_values)
+    utilities = np.diff(np.concatenate(([0], random_values, [k])))
+    assert len(utilities) == m, f"len: {len(utilities)}, m: {m}, k: {k}"
+    assert utilities.sum() == k, f"sum: {utilities.sum()}, k: {k}"
     if linear_pref is not None:
-        order = np.argsort(linear_pref)
-        return second[order]
-    return second
+        order =  np.argsort(linear_pref)
+        return utilities[order]
+    return utilities
 
 
 def trails(kwargs: dict, num_trails: int):
@@ -220,6 +239,7 @@ def main():
     copeland_rule = {"rule": vr.copeland, "name": "Copeland's Rule"}
     plurality_rule = {"rule": vr.plurality, "name": "the Plurality rule"}
     blacks_rule = {"rule": vr.blacks, "name": "Black's Rule"}
+    # data = gp.Profile.from_preflib("...")
 
     voting_rules = [borda_rule, copeland_rule, plurality_rule, blacks_rule]
 
