@@ -6,7 +6,6 @@ import pandas as pd
 from pref_voting import generate_profiles as gp
 from pref_voting import generate_utility_profiles as gup
 from pref_voting import voting_methods as vr
-from tabulate import Line
 
 from voting_rules import (
     nash_optimal,
@@ -42,7 +41,18 @@ plt.rcParams.update(
 
 
 class VotingGame:
-    def __init__(self, n, m, rule, optimal_rule, k=1, min_util=0, max_util=1, linear_profile: None | gp.Profile = None) -> None:
+    def __init__(
+        self,
+        n,
+        m,
+        rule,
+        optimal_rule,
+        k=1,
+        min_util=0,
+        max_util=1,
+        sample_size=100,
+        linear_profile: None | gp.Profile = None,
+    ) -> None:
         self.n: int = n
         self.m: int = m
         self.max_util: float = max_util
@@ -50,16 +60,24 @@ class VotingGame:
         self.rule: Callable = rule
         self.optimal_rule: Callable = optimal_rule
         self.k: int = k * m
+
+        # Allowing for the sampling of the larger profile.
+        self.sample_size = sample_size
+        self.sample_linear_profiles = None
+        self.sample_utils = None
+        self.sample_utility_profiles = None
+
         if linear_profile is not None:
             self.utils: np.ndarray = np.ndarray([])
             self.linear_profile = linear_profile
-            self.utility_profile = self.generate_random_profile_from(np.array(linear_profile.rankings))
+            self.utility_profile = self.generate_random_profile_from(
+                np.array(linear_profile.rankings)
+            )
+            self.n, self.m = self.utils.shape
         else:
             self.utils: np.ndarray = np.ndarray([])
             self.utility_profile = self.generate_random_profile()
-            self.linear_profile = gp.Profile(
-                [np.argsort(-self.utils[v]) for v in range(self.n)], [1] * self.n
-            )
+            self.linear_profile = self.linear_from_utility_profile(self.utils)
 
         # Assertions to ensure profiles have been properly generated
         assert (
@@ -80,17 +98,26 @@ class VotingGame:
             [generate_random_sum_k_utilities(self.m, self.k) for _ in range(self.n)]
         ).T
         self.utils = utils.T
+        return self.update_utility_profile(self.utils)
+
+    def update_utility_profile(self, utils):
         uprofs = gup.UtilityProfile(
             [
-                {cand: utils[cand][voter] for cand in range(self.m)}
+                {cand: self.utils[cand][voter] for cand in range(self.m)}
                 for voter in range(self.n)
             ]
         )
         return uprofs
-    def generate_random_profile_from(self, profile) -> gup.UtilityProfile:
 
+    def linear_from_utility_profile(self, utils):
+        return gp.Profile([np.argsort(-utils[v]) for v in range(self.n)], [1] * self.n)
+
+    def generate_random_profile_from(self, profile) -> gup.UtilityProfile:
         utils = np.array(
-            [generate_random_sum_k_utilities(self.m, self.k, profile[i, :]) for i in range(self.n)]
+            [
+                generate_random_sum_k_utilities(self.m, self.k, profile[i, :])
+                for i in range(self.n)
+            ]
         ).T
         self.utils = utils.T
         uprofs = gup.UtilityProfile(
@@ -101,30 +128,47 @@ class VotingGame:
         )
         return uprofs
 
-    def get_winner(self) -> int:
-        winner = self.rule(self.linear_profile)
-        assert (
-            winner < self.m
-        ), f"winner: {winner}, m: {self.m}\nprofile: {self.linear_profile}"
+    def get_winner(self, profile) -> int:
+        winner = self.rule(profile)
+        assert winner < self.m, f"winner: {winner}, m: {self.m}\nprofile: {profile}"
         return winner
 
-    def get_winner_opt(self) -> int:
-        winner = self.optimal_rule(self.utility_profile)
+    def get_winner_opt(self, profile) -> int:
+        winner = self.optimal_rule(profile)
         assert (
             winner < self.m
-        ), f"winner: {winner}, m: {self.m}\nprofile: {self.utility_profile.display()}"
+        ), f"winner: {winner}, m: {self.m}\nprofile: {profile.display()}"
         return winner
 
-    def get_utility(self, winners) -> np.ndarray:
-        return self.utils[:, winners]
+    def get_utility(self, winners, utility) -> np.ndarray:
+        return utility[:, winners]
 
-    def distortion(self) -> float:
-        rule_winner = self.get_winner()
-        opt_winner = self.get_winner_opt()
+    def gen_sample(self):
+        voters = np.random.randint(0, self.n, self.sample_size)
+        self.sample_utils = self.utils[voters, :]
+        self.sample_utility_profiles = self.update_utility_profile(self.sample_utils)
+        self.sample_linear_profiles = self.linear_from_utility_profile(
+            self.sample_utils
+        )
+
+    def distortion(self, sample=True) -> float:
+        if sample:
+            self.gen_sample()
+            profile = self.sample_linear_profiles
+            util_profile = self.sample_utility_profiles
+            utilities = self.sample_utils
+        else:
+            profile = self.linear_profile
+            util_profile = self.utility_profile
+            utilities = self.utils
+        assert profile is not None
+        opt_winner = self.get_winner_opt(util_profile)
+        rule_winner = self.get_winner(profile)
         return (
-            self.get_utility(opt_winner).sum() / self.get_utility(rule_winner).sum()
-            if self.get_utility(rule_winner).sum() > 0
-            else 1000
+            self.get_utility(opt_winner, utilities).sum()
+            / self.get_utility(rule_winner, utilities).sum()
+            if self.get_utility(rule_winner, utilities).sum() > 0
+            else 1000_000
         )
 
 
@@ -138,7 +182,7 @@ def generate_random_sum_k_utilities(
     assert len(utilities) == m, f"len: {len(utilities)}, m: {m}, k: {k}"
     assert utilities.sum() == k, f"sum: {utilities.sum()}, k: {k}"
     if linear_pref is not None:
-        order =  np.argsort(linear_pref)
+        order = np.argsort(linear_pref)
         return utilities[order]
     return utilities
 
@@ -161,7 +205,6 @@ def plot_distortions(
 ):
     var_distortions = np.var(distortions, axis=2)
     mean_distortions = np.mean(distortions, axis=2)
-    limit = mean_distortions[-3:, :].mean()
 
     plt.figure()
     colors = plt.get_cmap("viridis")(np.linspace(0, 1, mean_distortions.shape[1]))
@@ -196,6 +239,7 @@ def evaluate_rule(
     n_vals: list[int] | range,
     m_vals: list[int] | range,
     num_trails: int,
+    linear_profile=None,
 ):
     """
     Evalute the distortion of a voting rule (`rule`) against a rule that maximizes the social welfare (`optimal_rule`)
@@ -221,9 +265,13 @@ def evaluate_rule(
                 "optimal_rule": optimal_rule,
                 "min_util": 0,
                 "max_util": 1,
+                "sample_size": n,
+                "linear_profile": linear_profile,
+                # "linear_profile": None,
             }
             distortions[i, j] = trails(kwargs, num_trails)
     return distortions
+
 
 def save_results(results: dict):
     df = pd.DataFrame(results)
@@ -231,15 +279,15 @@ def save_results(results: dict):
     df.to_csv("data/results.csv")
     print("Results saved to data/results.csv")
 
+
 def main():
     n_vals = range(2, 100, 5)
     m_vals = range(5, 25, 5)
-    n_trails = 300
+    n_trails = 2
     borda_rule = {"rule": vr.borda, "name": "the Borda rule"}
     copeland_rule = {"rule": vr.copeland, "name": "Copeland's Rule"}
     plurality_rule = {"rule": vr.plurality, "name": "the Plurality rule"}
     blacks_rule = {"rule": vr.blacks, "name": "Black's Rule"}
-    # data = gp.Profile.from_preflib("...")
 
     voting_rules = [borda_rule, copeland_rule, plurality_rule, blacks_rule]
 
@@ -262,13 +310,14 @@ def main():
                 n_trails,
             )
 
-    save_results(results)
+    print(results)
+    # save_results(results)
 
     for voting_rule in voting_rules:
         for sw in socialwelfare_rules:
             plot_distortions(
                 results[voting_rule["name"] + sw["name"]],
-                f"Distortion of {voting_rule['name'] }, {sw['name']}",
+                f"test --Distortion of {voting_rule['name'] }, {sw['name']}",
                 "Number of voters",
                 "Distortion",
                 n_vals,
