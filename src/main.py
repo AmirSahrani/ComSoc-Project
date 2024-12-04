@@ -79,6 +79,10 @@ class VotingGame:
             self.utility_profile = self.generate_random_profile()
             self.linear_profile = self.linear_from_utility_profile(self.utils)
 
+        self.test_valid_init()
+
+
+    def test_valid_init(self):
         # Assertions to ensure profiles have been properly generated
         assert (
             self.linear_profile.num_cands == self.m
@@ -110,7 +114,8 @@ class VotingGame:
         return uprofs
 
     def linear_from_utility_profile(self, utils):
-        return gp.Profile([np.argsort(-utils[v]) for v in range(self.n)], [1] * self.n)
+        n = utils.shape[0]
+        return gp.Profile([np.argsort(-utils[v]) for v in range(n)], [1] * n)
 
     def generate_random_profile_from(self, profile) -> gup.UtilityProfile:
         utils = np.array(
@@ -146,7 +151,7 @@ class VotingGame:
     def gen_sample(self):
         voters = np.random.randint(0, self.n, self.sample_size)
         self.sample_utils = self.utils[voters, :]
-        self.sample_utility_profiles = self.update_utility_profile(self.sample_utils)
+        self.sample_utility_profiles = self.update_utility_profile(self.sample_utils.T)
         self.sample_linear_profiles = self.linear_from_utility_profile(
             self.sample_utils
         )
