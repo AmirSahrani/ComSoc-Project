@@ -10,4 +10,5 @@ dependencies = [
     "numpy>=2.0.2",
     "pref-voting>=1.14.18",
     "setuptools>=75.6.0",
+    "tqdm>=4.67.1",
 ]

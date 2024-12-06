@@ -6,6 +6,7 @@ import pandas as pd
 from pref_voting import generate_profiles as gp
 from pref_voting import generate_utility_profiles as gup
 from pref_voting import voting_methods as vr
+from tqdm import tqdm
 
 from voting_rules import (
     nash_optimal,
@@ -55,7 +56,7 @@ class VotingGame:
         self.m: int = m
         self.rule: Callable = rule
         self.utility_fun: Callable = utility_fun
-        self.optimal_rule: Callable = lambda x : np.argmax(self.utility_fun(x))
+        self.optimal_rule: Callable = lambda x: np.argmax(self.utility_fun(x))
         self.k: int = k * m
 
         # Allowing for the sampling of the larger profile.
@@ -75,15 +76,14 @@ class VotingGame:
 
         self.test_valid_init()
 
-
     def test_valid_init(self):
         assert (
-            self.linear_profile.num_cands == self.m and
-            self.linear_profile.num_voters == self.n
+            self.linear_profile.num_cands == self.m
+            and self.linear_profile.num_voters == self.n
         ), f"num_candidates: {self.linear_profile.num_cands}, m: {self.m}, num_voters: {self.linear_profile.num_voters}, n: {self.n}"
         assert (
-            self.utility_profile.num_cands == self.m and
-            self.utility_profile.num_voters == self.n
+            self.utility_profile.num_cands == self.m
+            and self.utility_profile.num_voters == self.n
         ), f"num_candidates: {self.utility_profile.num_cands}, m: {self.m}, num_voters: {self.utility_profile.num_voters}, n: {self.n}"
 
     def generate_random_profile(self) -> gup.UtilityProfile:
@@ -93,12 +93,9 @@ class VotingGame:
         return self.update_utility_profile(self.utils.T)
 
     def update_utility_profile(self, utils):
-        m,n = utils.shape
+        m, n = utils.shape
         uprofs = gup.UtilityProfile(
-            [
-                {cand: utils[cand][voter] for cand in range(m)}
-                for voter in range(n)
-            ]
+            [{cand: utils[cand][voter] for cand in range(m)} for voter in range(n)]
         )
         return uprofs
 
@@ -136,30 +133,27 @@ class VotingGame:
 
     def get_winner_opt(self, profile) -> int:
         winner = self.optimal_rule(profile)
-        assert (
-            winner < self.m
-        ), f"winner: {winner}, m: {self.m}\n"
+        assert winner < self.m, f"winner: {winner}, m: {self.m}\n"
         return winner
 
     def get_utility(self, winners, utility) -> np.ndarray:
         return self.utility_fun(utility)[winners]
-
 
     def distortion(self, sample=False) -> float:
         if sample:
             self.gen_sample()
             profile = self.sample_linear_profiles
             util_profile = self.sample_utility_profiles
-            utilities = self.sample_utils
         else:
             profile = self.linear_profile
             util_profile = self.utility_profile
-            utilities = self.utils
         assert profile is not None
         opt_winner = self.get_winner_opt(util_profile)
         rule_winner = self.get_winner(profile)
-        assert self.get_utility(opt_winner, util_profile).sum() >= \
-               self.get_utility(rule_winner, util_profile).sum()
+        assert (
+            self.get_utility(opt_winner, util_profile).sum()
+            >= self.get_utility(rule_winner, util_profile).sum()
+        )
 
         return (
             self.get_utility(opt_winner, util_profile).sum()
@@ -173,12 +167,14 @@ def generate_random_sum_k_utilities(
     m: int, k: int, linear_pref: np.ndarray | None = None
 ):
     assert k >= m
-    random_values = np.random.randint(0, k, m - 1)
+    # random_values = np.random.randint(0, k, m - 1)
+    random_values = np.random.choice(range(1, k), m - 1, replace=False)
     random_values = np.sort(random_values)
     utilities = np.diff(np.concatenate(([0], random_values, [k])))
     assert len(utilities) == m, f"len: {len(utilities)}, m: {m}, k: {k}"
     assert utilities.sum() == k, f"sum: {utilities.sum()}, k: {k}"
     if linear_pref is not None:
+        utilities = np.sort(utilities)[::-1]
         order = np.argsort(linear_pref)
         return utilities[order]
     return utilities
@@ -191,37 +187,35 @@ def trials(kwargs: dict, num_trials: int, sample=False):
     return distortions
 
 
-
 def violin_plot_rules(
-distortions: np.ndarray,
-title: str,
-xlabel: str,
-ylabel: str,
-labels: list[str],
-show: bool = True
+    distortions: np.ndarray,
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    labels: list[str],
+    show: bool = True,
 ):
     plt.figure(figsize=(10, 6))
     cmap = plt.get_cmap("viridis")
     colors = cmap(np.linspace(0, 1, distortions.shape[0]))
 
     parts = plt.violinplot(
-        [distortions[i, :] for i in range(distortions.shape[0])],
-        showmeans=True
+        [distortions[i, :] for i in range(distortions.shape[0])], showmeans=True
     )
 
-    for i, pc in enumerate(parts['bodies']):
+    for i, pc in enumerate(parts["bodies"]):
         pc.set_facecolor(colors[i])
-        pc.set_edgecolor('black')
-        pc.set_alpha(0.7)
+        pc.set_edgecolor("black")
+        pc.set_alpha(0.4)
 
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.xticks(ticks=range(1, len(labels) + 1), labels=labels)
-    plt.grid(axis='y')
+    plt.grid(axis="y")
 
     plt.tight_layout()
-    plt.savefig(f"figures/{title.replace(' ', '_')}.svg")
+    plt.savefig(f"figures/{title}.svg")
     if show:
         plt.show()
 
@@ -260,7 +254,7 @@ def plot_distortions(
     plt.grid(True)
     plt.legend(loc="upper right")
     plt.tight_layout()
-    plt.savefig(f"figures/{title.replace(' ', '_')}.svg")
+    plt.savefig(f"figures/{title}.svg")
     if show:
         plt.show()
 
@@ -283,19 +277,19 @@ def evaluate_rule_on_data(
         distortions: ND-array of shape (len(n_vals), len(m_vals), num_trials) containign the distortion of each run
     """
     if linear_profile is not None:
-        n,m = linear_profile.num_voters,  linear_profile.num_cands
+        n, m = linear_profile.num_voters, linear_profile.num_cands
     else:
-        n, m = 1,1
+        n, m = 1, 1
     kwargs = {
         "n": n,
         "m": m,
-        "k": 3,
+        "k": 50,
         "rule": rule,
         "utility_fun": optimal_rule,
-        "sample_size": 200,
+        "sample_size": 10,
         "linear_profile": linear_profile,
     }
-    return  trials(kwargs, num_trials, sample=True)
+    return trials(kwargs, num_trials, sample=True)
 
 
 def evaluate_rule(
@@ -325,7 +319,7 @@ def evaluate_rule(
             kwargs = {
                 "n": n,
                 "m": m,
-                "k": 3,
+                "k": 30,
                 "rule": rule,
                 "utility_fun": optimal_rule,
                 "sample_size": n,
@@ -345,7 +339,7 @@ def save_results(results: dict):
 def sampling_experiment(voting_rules, socialwelfare_rules, n_vals, m_vals, n_trials):
     results = {}
     # np.random.seed(1)
-    for voting_rule in voting_rules:
+    for voting_rule in tqdm(voting_rules):
         for sw in socialwelfare_rules:
             results[voting_rule["name"] + sw["name"]] = evaluate_rule(
                 vr_wrapper(voting_rule["rule"]),
@@ -357,22 +351,22 @@ def sampling_experiment(voting_rules, socialwelfare_rules, n_vals, m_vals, n_tri
     return results
 
 
-def full_data_set_experiment(voting_rules, socialwelfare_rules,n_trials, linear_profile):
-        results = {}
-        for voting_rule in voting_rules:
-            for sw in socialwelfare_rules:
-                results[voting_rule["name"] + sw["name"]] = evaluate_rule_on_data(
-                    vr_wrapper(voting_rule["rule"]),
-                    sw["rule"],
-                    n_trials,
-                    linear_profile
-                )
-        return results
+def full_data_set_experiment(
+    voting_rules, socialwelfare_rules, n_trials, linear_profile
+):
+    results = {}
+    for voting_rule in voting_rules:
+        for sw in socialwelfare_rules:
+            results[voting_rule["name"] + sw["name"]] = evaluate_rule_on_data(
+                vr_wrapper(voting_rule["rule"]), sw["rule"], n_trials, linear_profile
+            )
+    return results
+
 
 def main():
     n_vals = range(2, 100, 5)
     m_vals = range(2, 25, 5)
-    n_trials = 200
+    n_trials = 10
     borda_rule = {"rule": vr.borda, "name": "Borda rule"}
     copeland_rule = {"rule": vr.copeland, "name": "Copeland's Rule"}
     plurality_rule = {"rule": vr.plurality, "name": "Plurality rule"}
@@ -388,21 +382,24 @@ def main():
     socialwelfare_rules = [utilitarian_rule, nietz_rule, rawlsian_rule, nash_rule]
 
     profile = gp.Profile.from_preflib("data/00014-00000001.soc")
-    results = sampling_experiment(voting_rules, socialwelfare_rules, n_vals, m_vals, n_trials)
-    results_data = full_data_set_experiment(voting_rules, socialwelfare_rules, n_trials, profile)
+    results = sampling_experiment(
+        voting_rules, socialwelfare_rules, n_vals, m_vals, n_trials
+    )
+    results_data = full_data_set_experiment(
+        voting_rules, socialwelfare_rules, n_trials, profile
+    )
 
     for voting_rule in voting_rules:
         for sw in socialwelfare_rules:
             plot_distortions(
                 results[voting_rule["name"] + sw["name"]],
-                f"Distortion of {voting_rule['name'] }, {sw['name']}",
+                f"test -- Distortion of {voting_rule['name'] }, {sw['name']}",
                 "Number of voters",
                 "Distortion",
                 n_vals,
                 m_vals,
                 show=False,
             )
-
 
     for sw in socialwelfare_rules:
         r = []
@@ -418,6 +415,7 @@ def main():
             names,
             show=False,
         )
+
 
 if __name__ == "__main__":
     main()
