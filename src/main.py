@@ -126,18 +126,18 @@ class VotingGame:
             self.sample_utils
         )
 
-    def get_winner(self, profile) -> int:
+    def get_winner(self, profile: gp.Profile) -> int:
         winner = self.rule(profile)
         assert winner < self.m, f"winner: {winner}, m: {self.m}"
         return winner
 
-    def get_winner_opt(self, profile) -> int:
+    def get_winner_opt(self, profile: gup.UtilityProfile) -> int:
         winner = self.optimal_rule(profile)
         assert winner < self.m, f"winner: {winner}, m: {self.m}\n"
         return winner
 
-    def get_utility(self, winners, utility) -> np.ndarray:
-        return self.utility_fun(utility)[winners]
+    def get_utility(self, winner: int, utility: gup.UtilityProfile) -> np.ndarray:
+        return self.utility_fun(utility)[winner]
 
     def distortion(self, sample=False) -> float:
         if sample:
