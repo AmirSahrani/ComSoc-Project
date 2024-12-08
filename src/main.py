@@ -18,7 +18,7 @@ from voting_rules import (
 
 def vr_wrapper(vr_rule):
     def rule(x):
-        return vr_rule(x)[0]
+        return vr_rule(x)[0] - 1
 
     return rule
 
@@ -167,7 +167,6 @@ def generate_random_sum_k_utilities(
     m: int, k: int, linear_pref: np.ndarray | None = None
 ):
     assert k >= m
-    # random_values = np.random.randint(0, k, m - 1)
     random_values = np.random.choice(range(1, k), m - 1, replace=False)
     random_values = np.sort(random_values)
     utilities = np.diff(np.concatenate(([0], random_values, [k])))
@@ -366,7 +365,7 @@ def full_data_set_experiment(
 def main():
     n_vals = range(2, 100, 5)
     m_vals = range(2, 25, 5)
-    n_trials = 10
+    n_trials = 100
     borda_rule = {"rule": vr.borda, "name": "Borda rule"}
     copeland_rule = {"rule": vr.copeland, "name": "Copeland's Rule"}
     plurality_rule = {"rule": vr.plurality, "name": "Plurality rule"}
@@ -393,7 +392,7 @@ def main():
         for sw in socialwelfare_rules:
             plot_distortions(
                 results[voting_rule["name"] + sw["name"]],
-                f"test -- Distortion of {voting_rule['name'] }, {sw['name']}",
+                f"Distortion of {voting_rule['name'] }, {sw['name']}",
                 "Number of voters",
                 "Distortion",
                 n_vals,
