@@ -1,8 +1,8 @@
+import pickle
 from typing import Callable
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 from pref_voting import generate_profiles as gp
 from pref_voting import generate_utility_profiles as gup
 from pref_voting import voting_methods as vr
@@ -329,11 +329,8 @@ def evaluate_rule(
     return distortions
 
 
-def save_results(results: dict):
-    df = pd.DataFrame(results)
-    print(f"Saving Results: {df.head()}")
-    df.to_csv("data/results.csv")
-    print("Results saved to data/results.csv")
+def format_key(vr, sw):
+    return vr + ", " + sw
 
 
 def sampling_experiment(voting_rules, socialwelfare_rules, n_vals, m_vals, n_trials):
@@ -341,7 +338,7 @@ def sampling_experiment(voting_rules, socialwelfare_rules, n_vals, m_vals, n_tri
     # np.random.seed(1)
     for voting_rule in tqdm(voting_rules):
         for sw in socialwelfare_rules:
-            results[voting_rule["name"] + sw["name"]] = evaluate_rule(
+            results[format_key(voting_rule["name"], sw["name"])] = evaluate_rule(
                 vr_wrapper(voting_rule["rule"]),
                 sw["rule"],
                 n_vals,
@@ -357,15 +354,27 @@ def full_data_set_experiment(
     results = {}
     for voting_rule in voting_rules:
         for sw in socialwelfare_rules:
-            results[voting_rule["name"] + sw["name"]] = evaluate_rule_on_data(
-                vr_wrapper(voting_rule["rule"]), sw["rule"], n_trials, linear_profile
+            results[format_key(voting_rule["name"], sw["name"])] = (
+                evaluate_rule_on_data(
+                    vr_wrapper(voting_rule["rule"]),
+                    sw["rule"],
+                    n_trials,
+                    linear_profile,
+                )
             )
     return results
 
 
+def save_data(results: dict, filename: str):
+    with open(filename, "wb") as f:
+        pickle.dump(results, f)
+    print(f"resutls saved as {filename}")
+
+
 def main():
-    n_vals = range(2, 100, 5)
-    m_vals = range(2, 25, 5)
+    np.random.seed(1)
+    n_vals = range(2, 10, 5)
+    m_vals = range(2, 25, 10)
     n_trials = 10
     borda_rule = {"rule": vr.borda, "name": "Borda rule"}
     copeland_rule = {"rule": vr.copeland, "name": "Copeland's Rule"}
@@ -388,33 +397,35 @@ def main():
     results_data = full_data_set_experiment(
         voting_rules, socialwelfare_rules, n_trials, profile
     )
+    save_data(results_data, "results/sushi_data.pkl")
+    save_data(results, "results/random_sampling.pkl")
 
-    for voting_rule in voting_rules:
-        for sw in socialwelfare_rules:
-            plot_distortions(
-                results[voting_rule["name"] + sw["name"]],
-                f"test -- Distortion of {voting_rule['name'] }, {sw['name']}",
-                "Number of voters",
-                "Distortion",
-                n_vals,
-                m_vals,
-                show=False,
-            )
+    # for voting_rule in voting_rules:
+    #     for sw in socialwelfare_rules:
+    #         plot_distortions(
+    #             results[voting_rule["name"] + sw["name"]],
+    #             f"test -- Distortion of {voting_rule['name'] }, {sw['name']}",
+    #             "Number of voters",
+    #             "Distortion",
+    #             n_vals,
+    #             m_vals,
+    #             show=False,
+    #         )
 
-    for sw in socialwelfare_rules:
-        r = []
-        names = []
-        for voting_rule in voting_rules:
-            names.append(voting_rule["name"])
-            r.append(results_data[voting_rule["name"] + sw["name"]])
-        violin_plot_rules(
-            np.array(r),
-            f"Distortion Under {sw['name']}",
-            "Number of voters",
-            "Distortion",
-            names,
-            show=False,
-        )
+    # for sw in socialwelfare_rules:
+    #     r = []
+    #     names = []
+    #     for voting_rule in voting_rules:
+    #         names.append(voting_rule["name"])
+    #         r.append(results_data[voting_rule["name"] + sw["name"]])
+    #     violin_plot_rules(
+    #         np.array(r),
+    #         f"Distortion Under {sw['name']}",
+    #         "Number of voters",
+    #         "Distortion",
+    #         names,
+    #         show=False,
+    #     )
 
 
 if __name__ == "__main__":
