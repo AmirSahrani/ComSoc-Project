@@ -6,9 +6,11 @@ import numpy as np
 from pref_voting import generate_profiles as gp
 from pref_voting import generate_utility_profiles as gup
 from pref_voting import voting_methods as vr
+from pref_voting.combined_methods import instant_runoff_for_truncated_linear_orders
+from pref_voting.iterative_methods import instant_runoff
 from tqdm import tqdm
 
-from voting_rules import (
+from utility_functions import (
     nash_optimal,
     nietzschean_optimal,
     rawlsian_optimal,
@@ -148,6 +150,7 @@ class VotingGame:
             profile = self.linear_profile
             util_profile = self.utility_profile
         assert profile is not None
+        assert util_profile is not None
         opt_winner = self.get_winner_opt(util_profile)
         rule_winner = self.get_winner(profile)
         assert (
@@ -187,83 +190,14 @@ def trials(kwargs: dict, num_trials: int, sample=False):
     return distortions
 
 
-def violin_plot_rules(
-    distortions: np.ndarray,
-    title: str,
-    xlabel: str,
-    ylabel: str,
-    labels: list[str],
-    show: bool = True,
-):
-    plt.figure(figsize=(10, 6))
-    cmap = plt.get_cmap("viridis")
-    colors = cmap(np.linspace(0, 1, distortions.shape[0]))
-
-    parts = plt.violinplot(
-        [distortions[i, :] for i in range(distortions.shape[0])], showmeans=True
-    )
-
-    for i, pc in enumerate(parts["bodies"]):
-        pc.set_facecolor(colors[i])
-        pc.set_edgecolor("black")
-        pc.set_alpha(0.4)
-
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.xticks(ticks=range(1, len(labels) + 1), labels=labels)
-    plt.grid(axis="y")
-
-    plt.tight_layout()
-    plt.savefig(f"figures/{title}.svg")
-    if show:
-        plt.show()
-
-
-def plot_distortions(
-    distortions: np.ndarray,
-    title: str,
-    xlabel: str,
-    ylabel: str,
-    n_vals: list[int] | range,
-    m_vals: list[int] | range,
-    show: bool = True,
-):
-    var_distortions = np.var(distortions, axis=2)
-    mean_distortions = np.mean(distortions, axis=2)
-
-    plt.figure()
-    colors = plt.get_cmap("viridis")(np.linspace(0, 1, mean_distortions.shape[1]))
-
-    for m in range(mean_distortions.shape[1]):
-        plt.plot(
-            n_vals, mean_distortions[:, m], color=colors[m], label=f"m={m_vals[m]}"
-        )
-        plt.fill_between(
-            n_vals,
-            mean_distortions[:, m] - var_distortions[:, m],
-            mean_distortions[:, m] + var_distortions[:, m],
-            color=colors[m],
-            alpha=0.2,
-        )
-
-    plt.title(title)
-    plt.ylim((0, 8))
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.grid(True)
-    plt.legend(loc="upper right")
-    plt.tight_layout()
-    plt.savefig(f"figures/{title}.svg")
-    if show:
-        plt.show()
-
-
 def evaluate_rule_on_data(
     rule: Callable,
     optimal_rule: Callable,
     num_trials: int,
-    linear_profile=None,
+    sample_size: int,
+    k: int,
+    linear_profile: gp.Profile,
+    sample
 ):
     """
     Evalute the distortion of a voting rule (`rule`) against a rule that maximizes the social welfare (`optimal_rule`)
@@ -276,10 +210,7 @@ def evaluate_rule_on_data(
     returns:
         distortions: ND-array of shape (len(n_vals), len(m_vals), num_trials) containign the distortion of each run
     """
-    if linear_profile is not None:
-        n, m = linear_profile.num_voters, linear_profile.num_cands
-    else:
-        n, m = 1, 1
+    n, m = linear_profile.num_voters, linear_profile.num_cands
     kwargs = {
         "n": n,
         "m": m,
@@ -298,6 +229,7 @@ def evaluate_rule(
     n_vals: list[int] | range,
     m_vals: list[int] | range,
     num_trials: int,
+    k: int,
     linear_profile=None,
 ):
     """
@@ -319,10 +251,10 @@ def evaluate_rule(
             kwargs = {
                 "n": n,
                 "m": m,
-                "k": 30,
+                "k": k,
                 "rule": rule,
                 "utility_fun": optimal_rule,
-                "sample_size": n,
+                "sample_size": None,
                 "linear_profile": None,
             }
             distortions[i, j] = trials(kwargs, num_trials)
@@ -333,7 +265,7 @@ def format_key(vr, sw):
     return vr + ", " + sw
 
 
-def sampling_experiment(voting_rules, socialwelfare_rules, n_vals, m_vals, n_trials):
+def sampling_experiment(voting_rules, socialwelfare_rules, n_vals, m_vals, n_trials, k):
     results = {}
     # np.random.seed(1)
     for voting_rule in tqdm(voting_rules):
@@ -344,22 +276,26 @@ def sampling_experiment(voting_rules, socialwelfare_rules, n_vals, m_vals, n_tri
                 n_vals,
                 m_vals,
                 n_trials,
+                k
             )
     return results
 
 
 def full_data_set_experiment(
-    voting_rules, socialwelfare_rules, n_trials, linear_profile
+    voting_rules, socialwelfare_rules, n_trials, sample_size, k, linear_profile, sample_from_data_set
 ):
     results = {}
-    for voting_rule in voting_rules:
+    for voting_rule in tqdm(voting_rules):
         for sw in socialwelfare_rules:
             results[format_key(voting_rule["name"], sw["name"])] = (
                 evaluate_rule_on_data(
                     vr_wrapper(voting_rule["rule"]),
                     sw["rule"],
                     n_trials,
+                    sample_size,
+                    k,
                     linear_profile,
+                    sample_from_data_set
                 )
             )
     return results
@@ -370,62 +306,49 @@ def save_data(results: dict, filename: str):
         pickle.dump(results, f)
     print(f"resutls saved as {filename}")
 
+def gen_vr_list():
+    """function so that all other files can simply import this function"""
 
-def main():
-    np.random.seed(1)
-    n_vals = range(2, 10, 5)
-    m_vals = range(2, 25, 10)
-    n_trials = 10
     borda_rule = {"rule": vr.borda, "name": "Borda rule"}
     copeland_rule = {"rule": vr.copeland, "name": "Copeland's Rule"}
     plurality_rule = {"rule": vr.plurality, "name": "Plurality rule"}
     blacks_rule = {"rule": vr.blacks, "name": "Black's Rule"}
+    ir_rule= {"rule": instant_runoff, "name": "Instand-runoff voting"}
 
-    voting_rules = [borda_rule, copeland_rule, plurality_rule, blacks_rule]
+    return [borda_rule, copeland_rule, plurality_rule, blacks_rule, ir_rule]
 
+def gen_ut_list():
+    # Utility function to test on each voting rule
     nash_rule = {"rule": nash_optimal, "name": "Nash"}
     utilitarian_rule = {"rule": utilitarian_optimal, "name": "Utiliratian"}
     rawlsian_rule = {"rule": rawlsian_optimal, "name": "Rawlsian"}
     nietz_rule = {"rule": nietzschean_optimal, "name": "Nietzschean"}
 
-    socialwelfare_rules = [utilitarian_rule, nietz_rule, rawlsian_rule, nash_rule]
+    return [utilitarian_rule, nietz_rule, rawlsian_rule, nash_rule]
+
+def main():
+
+    # Experimental parameters
+    np.random.seed(1)
+    n_vals = range(2, 100, 5)
+    m_vals = range(2, 25, 10)
+    n_trials = 100
+    sample_size = 5000
+    k = 30
+    voting_rules = gen_vr_list()
+    socialwelfare_rules = gen_ut_list()
 
     profile = gp.Profile.from_preflib("data/00014-00000001.soc")
     results = sampling_experiment(
-        voting_rules, socialwelfare_rules, n_vals, m_vals, n_trials
+        voting_rules, socialwelfare_rules, n_vals, m_vals, n_trials, k
     )
-    results_data = full_data_set_experiment(
-        voting_rules, socialwelfare_rules, n_trials, profile
-    )
-    save_data(results_data, "results/sushi_data.pkl")
     save_data(results, "results/random_sampling.pkl")
 
-    # for voting_rule in voting_rules:
-    #     for sw in socialwelfare_rules:
-    #         plot_distortions(
-    #             results[voting_rule["name"] + sw["name"]],
-    #             f"test -- Distortion of {voting_rule['name'] }, {sw['name']}",
-    #             "Number of voters",
-    #             "Distortion",
-    #             n_vals,
-    #             m_vals,
-    #             show=False,
-    #         )
+    # results_data = full_data_set_experiment(
+    #     voting_rules, socialwelfare_rules, n_trials, sample_size, k, profile, sample_from_data_set=False
+    # )
+    # save_data(results_data, "results/sushi_data.pkl")
 
-    # for sw in socialwelfare_rules:
-    #     r = []
-    #     names = []
-    #     for voting_rule in voting_rules:
-    #         names.append(voting_rule["name"])
-    #         r.append(results_data[voting_rule["name"] + sw["name"]])
-    #     violin_plot_rules(
-    #         np.array(r),
-    #         f"Distortion Under {sw['name']}",
-    #         "Number of voters",
-    #         "Distortion",
-    #         names,
-    #         show=False,
-    #     )
 
 
 if __name__ == "__main__":

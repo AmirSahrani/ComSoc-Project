@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pref_voting import voting_methods as vr
 
-from main import format_key
-from voting_rules import (
+from main import (format_key, gen_vr_list, gen_ut_list)
+from utility_functions import (
     nash_optimal,
     nietzschean_optimal,
     rawlsian_optimal,
@@ -44,6 +44,7 @@ def violin_plot_rules(
     plt.savefig(f"figures/{title}.svg")
     if show:
         plt.show()
+    plt.close()
 
 
 def plot_distortions(
@@ -83,6 +84,7 @@ def plot_distortions(
     plt.savefig(f"figures/{title}.svg")
     if show:
         plt.show()
+    plt.close()
 
 
 def load(filename):
@@ -92,22 +94,12 @@ def load(filename):
 
 
 def main():
-    np.random.seed(1)
-    n_vals = range(2, 10, 5)
+    n_vals = range(2, 100, 5)
     m_vals = range(2, 25, 10)
-    borda_rule = {"rule": vr.borda, "name": "Borda rule"}
-    copeland_rule = {"rule": vr.copeland, "name": "Copeland's Rule"}
-    plurality_rule = {"rule": vr.plurality, "name": "Plurality rule"}
-    blacks_rule = {"rule": vr.blacks, "name": "Black's Rule"}
 
-    voting_rules = [borda_rule, copeland_rule, plurality_rule, blacks_rule]
+    voting_rules = gen_vr_list()
+    socialwelfare_rules = gen_ut_list()
 
-    nash_rule = {"rule": nash_optimal, "name": "Nash"}
-    utilitarian_rule = {"rule": utilitarian_optimal, "name": "Utiliratian"}
-    rawlsian_rule = {"rule": rawlsian_optimal, "name": "Rawlsian"}
-    nietz_rule = {"rule": nietzschean_optimal, "name": "Nietzschean"}
-
-    socialwelfare_rules = [utilitarian_rule, nietz_rule, rawlsian_rule, nash_rule]
     results = load("results/random_sampling.pkl")
     results_data = load("results/sushi_data.pkl")
 

@@ -26,7 +26,7 @@ def nash_optimal(profile):
     # profile = utilities_to_np(profile) + np.exp(-6)
     profile = utilities_to_np(profile)
     m = profile.shape[0]
-    sw = np.pow(profile, 1 / m).prod(axis=0)
+    sw = np.power(profile, 1 / m).prod(axis=0)
     return sw
 
 
