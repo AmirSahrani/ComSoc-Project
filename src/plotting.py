@@ -60,11 +60,13 @@ def plot_distortions(
     mean_distortions = np.mean(distortions, axis=2)
 
     plt.figure()
-    colors = plt.get_cmap("viridis")(np.linspace(0, 1, mean_distortions.shape[1]))
+    colors = plt.get_cmap("viridis")(
+        np.linspace(0, 1, mean_distortions.shape[1]))
 
     for m in range(mean_distortions.shape[1]):
         plt.plot(
-            n_vals, mean_distortions[:, m], color=colors[m], label=f"m={m_vals[m]}"
+            n_vals, mean_distortions[:,
+                                     m], color=colors[m], label=f"m={m_vals[m]}"
         )
         plt.fill_between(
             n_vals,
@@ -107,7 +109,7 @@ def main():
         for sw in socialwelfare_rules:
             plot_distortions(
                 results[format_key(voting_rule["name"], sw["name"])],
-                f"test -- Distortion of {voting_rule['name'] }, {sw['name']}",
+                f"Distortion of {voting_rule['name']}, {sw['name']}",
                 "Number of voters",
                 "Distortion",
                 n_vals,
