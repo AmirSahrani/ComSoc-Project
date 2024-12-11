@@ -1,26 +1,17 @@
-import pickle
-
-import jax
-import matplotlib.pyplot as plt
-import numpy as np
-from plotting import load
-from pref_voting import voting_methods as vr
-import pymc as pm
-import pandas as pd
 import multiprocessing as mp
 from functools import partial
 
-from main import (format_key, gen_vr_list, gen_ut_list)
-from utility_functions import (
-    nash_optimal,
-    nietzschean_optimal,
-    rawlsian_optimal,
-    utilitarian_optimal,
-)
+import numpy as np
+import pandas as pd
+import pymc as pm
+
+from main import gen_ut_list, gen_vr_list, save_data
+from plotting import load
 
 
 def split(key):
     return key.split(", ")
+
 
 def fit_bayesian_regression(key_data, n_vals, m_vals):
     """
@@ -67,7 +58,7 @@ def fit_bayesian_regression(key_data, n_vals, m_vals):
 
 def fit_parallel(results, func, kwargs, n_processes=None):
     if n_processes is None:
-        n_processes = max(mp.cpu_count()//2, 1)
+        n_processes = max(mp.cpu_count() // 2, 1)
 
     # Create a pool of workers
     with mp.Pool(processes=n_processes) as pool:
@@ -93,13 +84,13 @@ def get_regression_stats(traces):
 
     for (voting_rule, utility_function), trace in traces.items():
         # Get beta_n statistics
-        beta_n_samples = trace.posterior['beta_n'].values.flatten()
+        beta_n_samples = trace.posterior["beta_n"].values.flatten()
         beta_n_mean = np.mean(beta_n_samples)
         beta_n_std = np.std(beta_n_samples)
         beta_n_ci = np.percentile(beta_n_samples, [0.5, 99.5])  # 99% CI
 
         # Get beta_m statistics
-        beta_m_samples = trace.posterior['beta_m'].values.flatten()
+        beta_m_samples = trace.posterior["beta_m"].values.flatten()
         beta_m_mean = np.mean(beta_m_samples)
         beta_m_std = np.std(beta_m_samples)
         beta_m_ci = np.percentile(beta_m_samples, [0.5, 99.5])  # 99% CI
@@ -107,19 +98,16 @@ def get_regression_stats(traces):
         stats[(voting_rule, utility_function)] = {
             "voting_rule": voting_rule,
             "utility_function": utility_function,
-            "beta_n": {
-                "mean": beta_n_mean,
-                "std": beta_n_std,
-                "ci_99": tuple(beta_n_ci)
-            },
-            "beta_m": {
-                "mean": beta_m_mean,
-                "std": beta_m_std,
-                "ci_99": tuple(beta_m_ci)
-            }
+            "beta_n_mean": beta_n_mean,
+            "beta_n_std": beta_n_std,
+            "beta_n_ci99": tuple(beta_n_ci),
+            "beta_m_mean": beta_m_mean,
+            "beta_m_std": beta_m_std,
+            "beta_m_ci_99": tuple(beta_m_ci),
         }
 
     return stats
+
 
 def mean_estimate(key_data):
     """
@@ -131,7 +119,7 @@ def mean_estimate(key_data):
     Returns:
         dict: A dictionary with computed statistics for each key.
     """
-    key,data = key_data
+    key, data = key_data
     stats = {}
 
     voting_rule, utility_function = split(key)
@@ -148,7 +136,9 @@ def mean_estimate(key_data):
 
         # Compute log-likelihood for Bayes factor estimation
         trace = pm.sampling.sample(nuts_sampler="numpyro")
-        posterior_predictive = pm.sample_posterior_predictive(trace, return_inferencedata=False)
+        posterior_predictive = pm.sample_posterior_predictive(
+            trace, return_inferencedata=False
+        )
 
         # Get posterior predictive samples
         y_obs_samples = posterior_predictive["y_obs"]
@@ -159,9 +149,11 @@ def mean_estimate(key_data):
         "utility_function": utility_function,
         "mean": mean,
         "std": std,
-        "ci 99%": (lower_bound, upper_bound),  # example, refine based on your specific need
+        "ci 99%": (
+            lower_bound,
+            upper_bound,
+        ),  # example, refine based on your specific need
     }
-
 
 
 def main():
@@ -172,16 +164,19 @@ def main():
 
     results = load("results/random_sampling.pkl")
     results_data = load("results/sushi_data.pkl")
-    models = fit_parallel(results, fit_bayesian_regression,{"n_vals": n_vals, "m_vals": m_vals})
+    models = fit_parallel(
+        results, fit_bayesian_regression, {"n_vals": n_vals, "m_vals": m_vals}
+    )
     stats = get_regression_stats(models)
     models_means = fit_parallel(results_data, mean_estimate, {})
+    save_data(stats, "results/stats_regression.pkl")
+    save_data(models_means, "results/stats_means.pkl")
 
     df = pd.DataFrame(stats)
     print(df.head())
 
     df = pd.DataFrame(models_means)
     print(df.head())
-
 
 
 if __name__ == "__main__":
