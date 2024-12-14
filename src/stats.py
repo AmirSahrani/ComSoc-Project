@@ -158,19 +158,19 @@ def mean_estimate(key_data):
 
 def main():
     n_vals = range(2, 100, 5)
-    m_vals = range(2, 25, 10)
+    m_vals = range(2, 25, 5)
     voting_rules = gen_vr_list()
     socialwelfare_rules = gen_ut_list()
 
-    results = load("results/random_sampling.pkl")
-    results_data = load("results/sushi_data.pkl")
+    results = load("results/random_sampling_k_10.pkl")
+    results_data = load("results/sushi_data_k_10.pkl")
     models = fit_parallel(
         results, fit_bayesian_regression, {"n_vals": n_vals, "m_vals": m_vals}
     )
     stats = get_regression_stats(models)
     models_means = fit_parallel(results_data, mean_estimate, {})
-    save_data(stats, "results/stats_regression.pkl")
-    save_data(models_means, "results/stats_means.pkl")
+    save_data(stats, "results/stats_regression_k_10.pkl")
+    save_data(models_means, "results/stats_means_k_10.pkl")
 
     df = pd.DataFrame(stats)
     print(df.head())

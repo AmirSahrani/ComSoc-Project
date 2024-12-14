@@ -20,26 +20,9 @@ from utility_functions import (
 def vr_wrapper(vr_rule):
     def rule(x):
         return vr_rule(x)[0]
-
     return rule
 
 
-plt.rcParams.update(
-    {
-        "font.size": 14,
-        "axes.labelsize": 13,
-        "axes.titlesize": 13,
-        "xtick.labelsize": 11,
-        "ytick.labelsize": 11,
-        "legend.fontsize": 11,
-        "axes.linewidth": 1,
-        "grid.linewidth": 1,
-        "grid.alpha": 0.3,
-        "image.cmap": "viridis",
-        "text.usetex": True,
-        "font.family": "Computer Modern",
-    }
-)
 
 
 class VotingGame:
@@ -311,12 +294,13 @@ def gen_vr_list():
     """function so that all other files can simply import this function"""
 
     borda_rule = {"rule": vr.borda, "name": "Borda rule"}
-    copeland_rule = {"rule": vr.copeland, "name": "Copeland's Rule"}
+    veto_rule = {"rule": vr.plurality_veto, "name": "Veto - Plurality rule"}
+    # copeland_rule = {"rule": vr.copeland, "name": "Copeland's Rule"}
     plurality_rule = {"rule": vr.plurality, "name": "Plurality rule"}
     blacks_rule = {"rule": vr.blacks, "name": "Black's Rule"}
     ir_rule = {"rule": instant_runoff, "name": "Instand-runoff voting"}
 
-    return [borda_rule, copeland_rule, plurality_rule, blacks_rule, ir_rule]
+    return [borda_rule, veto_rule, plurality_rule, blacks_rule, ir_rule]
 
 
 def gen_ut_list():
@@ -331,12 +315,12 @@ def gen_ut_list():
 
 def main():
     # Experimental parameters
-    np.random.seed(1)
+    np.random.seed(2)
     n_vals = range(2, 100, 5)
-    m_vals = range(2, 25, 10)
+    m_vals = range(2, 25, 5)
     n_trials = 100
     sample_size = 5000
-    k = 5
+    k = 10
     voting_rules = gen_vr_list()
     socialwelfare_rules = gen_ut_list()
 

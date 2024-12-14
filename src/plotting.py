@@ -6,6 +6,23 @@ import numpy as np
 from main import format_key, gen_ut_list, gen_vr_list
 
 
+plt.rcParams.update(
+    {
+        "font.size": 14,
+        "axes.labelsize": 13,
+        "axes.titlesize": 13,
+        "xtick.labelsize": 11,
+        "ytick.labelsize": 12,
+        "legend.fontsize": 12,
+        "axes.linewidth": 1,
+        "grid.linewidth": 1,
+        "grid.alpha": 0.3,
+        "image.cmap": "viridis",
+        "text.usetex": True,
+        "font.family": "Computer Modern",
+    }
+)
+
 def violin_plot_rules(
     distortions: np.ndarray,
     title: str,
@@ -34,7 +51,7 @@ def violin_plot_rules(
     plt.grid(axis="y")
 
     plt.tight_layout()
-    plt.savefig(f"figures/{title}.svg")
+    plt.savefig(f"figures/{title}.pdf")
     if show:
         plt.show()
     plt.close()
@@ -117,7 +134,7 @@ def plot_distortions_multi_fig(
 
     # Save each figure separately
     for title in titles:
-        plt.savefig(f"figures/{title}.svg")
+        plt.savefig(f"figures/{title}.pdf")
 
     if show:
         plt.show()
@@ -158,7 +175,7 @@ def plot_distortions(
     plt.grid(True)
     plt.legend(loc="upper right")
     plt.tight_layout()
-    plt.savefig(f"figures/{title}.svg")
+    plt.savefig(f"figures/{title}.pdf")
     if show:
         plt.show()
     plt.close()
@@ -172,13 +189,13 @@ def load(filename):
 
 def main():
     n_vals = range(2, 100, 5)
-    m_vals = range(2, 25, 10)
+    m_vals = range(2, 25, 5)
 
     voting_rules = gen_vr_list()
     socialwelfare_rules = gen_ut_list()
 
-    results = load("results/random_sampling_k_5.pkl")
-    results_data = load("results/sushi_data_k_5.pkl")
+    results = load("results/random_sampling_k_10.pkl")
+    results_data = load("results/sushi_data_k_10.pkl")
 
     for voting_rule in voting_rules:
         for sw in socialwelfare_rules:
@@ -200,7 +217,7 @@ def main():
             r.append(results_data[format_key(voting_rule["name"], sw["name"])])
         violin_plot_rules(
             np.array(r),
-            f"Distortion Under {sw['name']}",
+            f"Distortion Under {sw['name']} Social Utility",
             "Number of voters",
             "Distortion",
             names,
