@@ -6,7 +6,6 @@ import numpy as np
 from pref_voting import generate_profiles as gp
 from pref_voting import generate_utility_profiles as gup
 from pref_voting import voting_methods as vr
-from pref_voting.combined_methods import instant_runoff_for_truncated_linear_orders
 from pref_voting.iterative_methods import instant_runoff
 from tqdm import tqdm
 
@@ -197,7 +196,7 @@ def evaluate_rule_on_data(
     sample_size: int,
     k: int,
     linear_profile: gp.Profile,
-    sample
+    sample,
 ):
     """
     Evalute the distortion of a voting rule (`rule`) against a rule that maximizes the social welfare (`optimal_rule`)
@@ -271,18 +270,19 @@ def sampling_experiment(voting_rules, socialwelfare_rules, n_vals, m_vals, n_tri
     for voting_rule in tqdm(voting_rules):
         for sw in socialwelfare_rules:
             results[format_key(voting_rule["name"], sw["name"])] = evaluate_rule(
-                vr_wrapper(voting_rule["rule"]),
-                sw["rule"],
-                n_vals,
-                m_vals,
-                n_trials,
-                k
+                vr_wrapper(voting_rule["rule"]), sw["rule"], n_vals, m_vals, n_trials, k
             )
     return results
 
 
 def full_data_set_experiment(
-    voting_rules, socialwelfare_rules, n_trials, sample_size, k, linear_profile, sample_from_data_set
+    voting_rules,
+    socialwelfare_rules,
+    n_trials,
+    sample_size,
+    k,
+    linear_profile,
+    sample_from_data_set,
 ):
     results = {}
     for voting_rule in tqdm(voting_rules):
@@ -295,7 +295,7 @@ def full_data_set_experiment(
                     sample_size,
                     k,
                     linear_profile,
-                    sample_from_data_set
+                    sample_from_data_set,
                 )
             )
     return results
@@ -306,6 +306,7 @@ def save_data(results: dict, filename: str):
         pickle.dump(results, f)
     print(f"resutls saved as {filename}")
 
+
 def gen_vr_list():
     """function so that all other files can simply import this function"""
 
@@ -313,9 +314,10 @@ def gen_vr_list():
     copeland_rule = {"rule": vr.copeland, "name": "Copeland's Rule"}
     plurality_rule = {"rule": vr.plurality, "name": "Plurality rule"}
     blacks_rule = {"rule": vr.blacks, "name": "Black's Rule"}
-    ir_rule= {"rule": instant_runoff, "name": "Instand-runoff voting"}
+    ir_rule = {"rule": instant_runoff, "name": "Instand-runoff voting"}
 
     return [borda_rule, copeland_rule, plurality_rule, blacks_rule, ir_rule]
+
 
 def gen_ut_list():
     # Utility function to test on each voting rule
@@ -326,15 +328,15 @@ def gen_ut_list():
 
     return [utilitarian_rule, nietz_rule, rawlsian_rule, nash_rule]
 
-def main():
 
+def main():
     # Experimental parameters
     np.random.seed(1)
     n_vals = range(2, 100, 5)
     m_vals = range(2, 25, 10)
     n_trials = 100
     sample_size = 5000
-    k = 30
+    k = 5
     voting_rules = gen_vr_list()
     socialwelfare_rules = gen_ut_list()
 
@@ -342,13 +344,18 @@ def main():
     results = sampling_experiment(
         voting_rules, socialwelfare_rules, n_vals, m_vals, n_trials, k
     )
-    save_data(results, "results/random_sampling.pkl")
+    save_data(results, f"results/random_sampling_k_{k}.pkl")
 
-    # results_data = full_data_set_experiment(
-    #     voting_rules, socialwelfare_rules, n_trials, sample_size, k, profile, sample_from_data_set=False
-    # )
-    # save_data(results_data, "results/sushi_data.pkl")
-
+    results_data = full_data_set_experiment(
+        voting_rules,
+        socialwelfare_rules,
+        n_trials,
+        sample_size,
+        k,
+        profile,
+        sample_from_data_set=False,
+    )
+    save_data(results_data, f"results/sushi_data_k_{k}.pkl")
 
 
 if __name__ == "__main__":

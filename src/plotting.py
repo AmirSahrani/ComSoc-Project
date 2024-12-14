@@ -2,15 +2,8 @@ import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
-from pref_voting import voting_methods as vr
 
-from main import (format_key, gen_vr_list, gen_ut_list)
-from utility_functions import (
-    nash_optimal,
-    nietzschean_optimal,
-    rawlsian_optimal,
-    utilitarian_optimal,
-)
+from main import format_key, gen_ut_list, gen_vr_list
 
 
 def violin_plot_rules(
@@ -47,6 +40,90 @@ def violin_plot_rules(
     plt.close()
 
 
+def plot_distortions_multi_fig(
+    distortions: list[np.ndarray],
+    titles: list[str],
+    xlabel: str,
+    ylabel: str,
+    n_vals: list[int] | range,
+    m_vals: list[int] | range,
+    show: bool = True,
+    n_cols: int = 2,
+):
+    """
+    Plot multiple distortion figures with shared x and y labels.
+
+    Args:
+        distortions: List of distortion arrays, each with shape (n_samples, n_m_values, n_repetitions)
+        titles: List of titles for each figure
+        xlabel: Shared x-axis label
+        ylabel: Shared y-axis label
+        n_vals: Values for x-axis
+        m_vals: Values for different lines in each plot
+        show: Whether to display the plots
+        n_cols: Number of columns in the grid of plots
+    """
+    n_figs = len(distortions)
+    n_rows = (n_figs + n_cols - 1) // n_cols  # Ceiling division
+
+    # Create figure and axes grid
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(6 * n_cols, 5 * n_rows))
+    if n_figs == 1:
+        axes = np.array([[axes]])  # Make it 2D for consistency
+    elif n_rows == 1:
+        axes = axes.reshape(1, -1)  # Make it 2D for consistency
+
+    # Flatten axes for easier iteration
+    axes_flat = axes.flatten()
+
+    # Create color map
+    colors = plt.get_cmap("viridis")(np.linspace(0, 1, distortions[0].shape[1]))
+
+    for idx, (distortion, title, ax) in enumerate(zip(distortions, titles, axes_flat)):
+        if idx < n_figs:  # Only plot if we have data
+            var_distortion = np.var(distortion, axis=2)
+            mean_distortion = np.mean(distortion, axis=2)
+
+            for m in range(mean_distortion.shape[1]):
+                ax.plot(
+                    n_vals,
+                    mean_distortion[:, m],
+                    color=colors[m],
+                    label=f"m={m_vals[m]}",
+                )
+                ax.fill_between(
+                    n_vals,
+                    mean_distortion[:, m] - var_distortion[:, m],
+                    mean_distortion[:, m] + var_distortion[:, m],
+                    color=colors[m],
+                    alpha=0.2,
+                )
+
+            ax.set_title(title)
+            ax.set_ylim((0, 8))
+            ax.grid(True)
+            ax.legend(loc="upper right")
+        else:
+            # Hide unused subplots
+            ax.set_visible(False)
+
+    # Set shared labels
+    for ax in axes[-1, :]:
+        ax.set_xlabel(xlabel)
+    for ax in axes[:, 0]:
+        ax.set_ylabel(ylabel)
+
+    plt.tight_layout()
+
+    # Save each figure separately
+    for title in titles:
+        plt.savefig(f"figures/{title}.svg")
+
+    if show:
+        plt.show()
+    plt.close()
+
+
 def plot_distortions(
     distortions: np.ndarray,
     title: str,
@@ -60,13 +137,11 @@ def plot_distortions(
     mean_distortions = np.mean(distortions, axis=2)
 
     plt.figure()
-    colors = plt.get_cmap("viridis")(
-        np.linspace(0, 1, mean_distortions.shape[1]))
+    colors = plt.get_cmap("viridis")(np.linspace(0, 1, mean_distortions.shape[1]))
 
     for m in range(mean_distortions.shape[1]):
         plt.plot(
-            n_vals, mean_distortions[:,
-                                     m], color=colors[m], label=f"m={m_vals[m]}"
+            n_vals, mean_distortions[:, m], color=colors[m], label=f"m={m_vals[m]}"
         )
         plt.fill_between(
             n_vals,
@@ -102,8 +177,8 @@ def main():
     voting_rules = gen_vr_list()
     socialwelfare_rules = gen_ut_list()
 
-    results = load("results/random_sampling.pkl")
-    results_data = load("results/sushi_data.pkl")
+    results = load("results/random_sampling_k_5.pkl")
+    results_data = load("results/sushi_data_k_5.pkl")
 
     for voting_rule in voting_rules:
         for sw in socialwelfare_rules:
