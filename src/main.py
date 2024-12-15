@@ -152,7 +152,6 @@ def generate_random_sum_k_utilities(
     m: int, k: int, linear_pref: np.ndarray | None = None
 ):
     assert k >= m
-    # random_values = np.random.randint(0, k, m - 1)
     random_values = np.random.choice(range(1, k), m - 1, replace=False)
     random_values = np.sort(random_values)
     utilities = np.diff(np.concatenate(([0], random_values, [k])))
@@ -196,7 +195,7 @@ def evaluate_rule_on_data(
     kwargs = {
         "n": n,
         "m": m,
-        "k": 50,
+        "k": k,
         "rule": rule,
         "utility_fun": optimal_rule,
         "sample_size": 10,
@@ -236,7 +235,7 @@ def evaluate_rule(
                 "k": k,
                 "rule": rule,
                 "utility_fun": optimal_rule,
-                "sample_size": None,
+                "sample_size": n,
                 "linear_profile": None,
             }
             distortions[i, j] = trials(kwargs, num_trials)
@@ -247,13 +246,13 @@ def format_key(vr, sw):
     return vr + ", " + sw
 
 
-def sampling_experiment(voting_rules, socialwelfare_rules, n_vals, m_vals, n_trials, k):
+def sampling_experiment(voting_rules, socialwelfare_rules, n_vals, m_vals, n_trials, k, profile):
     results = {}
     # np.random.seed(1)
     for voting_rule in tqdm(voting_rules):
         for sw in socialwelfare_rules:
             results[format_key(voting_rule["name"], sw["name"])] = evaluate_rule(
-                vr_wrapper(voting_rule["rule"]), sw["rule"], n_vals, m_vals, n_trials, k
+                vr_wrapper(voting_rule["rule"]), sw["rule"], n_vals, m_vals, n_trials, k,profile
             )
     return results
 
@@ -320,13 +319,13 @@ def main():
     m_vals = range(2, 25, 5)
     n_trials = 100
     sample_size = 5000
-    k = 10
+    k = 15
     voting_rules = gen_vr_list()
     socialwelfare_rules = gen_ut_list()
 
     profile = gp.Profile.from_preflib("data/00014-00000001.soc")
     results = sampling_experiment(
-        voting_rules, socialwelfare_rules, n_vals, m_vals, n_trials, k
+        voting_rules, socialwelfare_rules, n_vals, m_vals, n_trials, k, profile
     )
     save_data(results, f"results/random_sampling_k_{k}.pkl")
 

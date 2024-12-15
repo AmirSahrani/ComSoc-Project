@@ -6,7 +6,6 @@ from plotting import load
 
 # %%
 dic = load("../results/stats_regression_k_10.pkl")
-print(dic)
 df = pd.DataFrame(dic)
 
 

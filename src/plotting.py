@@ -8,12 +8,12 @@ from main import format_key, gen_ut_list, gen_vr_list
 
 plt.rcParams.update(
     {
-        "font.size": 14,
-        "axes.labelsize": 13,
-        "axes.titlesize": 13,
-        "xtick.labelsize": 11,
-        "ytick.labelsize": 12,
-        "legend.fontsize": 12,
+        "font.size": 16,
+        "axes.labelsize": 14,
+        "axes.titlesize": 14,
+        "xtick.labelsize": 12,
+        "ytick.labelsize": 13,
+        "legend.fontsize": 13,
         "axes.linewidth": 1,
         "grid.linewidth": 1,
         "grid.alpha": 0.3,
@@ -60,12 +60,13 @@ def violin_plot_rules(
 def plot_distortions_multi_fig(
     distortions: list[np.ndarray],
     titles: list[str],
+    main_title: str,
     xlabel: str,
     ylabel: str,
     n_vals: list[int] | range,
     m_vals: list[int] | range,
     show: bool = True,
-    n_cols: int = 2,
+    n_cols: int = 4,
 ):
     """
     Plot multiple distortion figures with shared x and y labels.
@@ -119,7 +120,8 @@ def plot_distortions_multi_fig(
             ax.set_title(title)
             ax.set_ylim((0, 8))
             ax.grid(True)
-            ax.legend(loc="upper right")
+            if idx == 3:
+                ax.legend(loc="upper right")
         else:
             # Hide unused subplots
             ax.set_visible(False)
@@ -130,11 +132,9 @@ def plot_distortions_multi_fig(
     for ax in axes[:, 0]:
         ax.set_ylabel(ylabel)
 
+    fig.suptitle(main_title)
     plt.tight_layout()
-
-    # Save each figure separately
-    for title in titles:
-        plt.savefig(f"figures/{title}.pdf")
+    fig.savefig(f"figures/multiplot{main_title}.pdf")
 
     if show:
         plt.show()
@@ -181,6 +181,83 @@ def plot_distortions(
     plt.close()
 
 
+def violin_plot_social_welfare(
+    results_data: dict,
+    socialwelfare_rules: list[dict],
+    voting_rules: list[dict],
+    title: str,
+    ylabel: str,
+    show: bool = True,
+):
+    """
+    Generate violin plots for multiple notions of social welfare.
+
+    Args:
+        results_data: Dictionary of results, where keys are formatted using format_key.
+        socialwelfare_rules: List of social welfare rule dictionaries.
+        voting_rules: List of voting rule dictionaries.
+        title: Title of the plot.
+        ylabel: Y-axis label.
+        show: Whether to display the plot.
+    """
+    plt.figure(figsize=(12, 8))
+
+    # Generate colors for each social welfare rule
+    cmap = plt.get_cmap("viridis")
+    colors = cmap(np.linspace(0, 1, len(socialwelfare_rules)))
+
+    # Prepare data for the violin plot
+    data = []
+    positions = []
+    labels = []
+    color_mapping = []
+
+    for vr_idx, voting_rule in enumerate(voting_rules):
+        for sw_idx, sw in enumerate(socialwelfare_rules):
+            key = format_key(voting_rule["name"], sw["name"])
+            if key in results_data:
+                data.append(results_data[key])
+                positions.append(vr_idx * (len(socialwelfare_rules) + 1) + sw_idx)
+                if sw_idx == 0:  # Only add voting rule labels once per group
+                    labels.append(voting_rule["name"])
+                color_mapping.append(colors[sw_idx])
+
+    # Create the violin plot
+    parts = plt.violinplot(data, positions=positions, showmeans=True)
+
+    for i, pc in enumerate(parts["bodies"]):
+        pc.set_facecolor(color_mapping[i])
+        pc.set_edgecolor("black")
+        pc.set_alpha(0.6)
+
+    # Calculate tick positions for voting rules
+    tick_positions = [
+        vr_idx * (len(socialwelfare_rules) + 1) + (len(socialwelfare_rules) - 1) / 2
+        for vr_idx in range(len(voting_rules))
+    ]
+
+    # Add labels and title
+    plt.xticks(ticks=tick_positions, labels=labels, rotation=45, ha="right")
+    plt.ylabel(ylabel)
+    plt.ylim((0,10))
+    plt.title(title)
+    plt.grid(axis="y", linestyle="--", alpha=0.6)
+
+    # Add legend for social welfare rules
+    handles = [
+        plt.Line2D([0], [0], color=colors[i], lw=6, label=sw["name"])
+        for i, sw in enumerate(socialwelfare_rules)
+    ]
+    plt.legend(handles=handles, title="Social Welfare Rules", loc="upper right")
+
+    plt.tight_layout()
+
+    # Save and optionally show the plot
+    plt.savefig(f"figures/{title.replace(' ', '_')}.pdf")
+    if show:
+        plt.show()
+    plt.close()
+
 def load(filename):
     with open(filename, "rb") as f:
         results = pickle.load(f)
@@ -194,35 +271,48 @@ def main():
     voting_rules = gen_vr_list()
     socialwelfare_rules = gen_ut_list()
 
-    results = load("results/random_sampling_k_10.pkl")
-    results_data = load("results/sushi_data_k_10.pkl")
+    results = load("results/random_sampling_k_15.pkl")
+    results_data = load("results/sushi_data_k_15.pkl")
 
-    for voting_rule in voting_rules:
-        for sw in socialwelfare_rules:
-            plot_distortions(
-                results[format_key(voting_rule["name"], sw["name"])],
-                f"Distortion of {voting_rule['name']}, {sw['name']}",
-                "Number of voters",
-                "Distortion",
-                n_vals,
-                m_vals,
-                show=False,
-            )
+    # for voting_rule in voting_rules:
+    #     for sw in socialwelfare_rules:
+    #         plot_distortions(
+    #             results[format_key(voting_rule["name"], sw["name"])],
+    #             f"Distortion of {voting_rule['name']}, {sw['name']}",
+    #             "Number of voters",
+    #             "Distortion",
+    #             n_vals,
+    #             m_vals,
+    #             show=False,
+    #         )
 
-    for sw in socialwelfare_rules:
-        r = []
-        names = []
-        for voting_rule in voting_rules:
-            names.append(voting_rule["name"])
-            r.append(results_data[format_key(voting_rule["name"], sw["name"])])
-        violin_plot_rules(
-            np.array(r),
-            f"Distortion Under {sw['name']} Social Utility",
-            "Number of voters",
-            "Distortion",
-            names,
-            show=False,
-        )
+    # for sw in socialwelfare_rules:
+    #     r = []
+    #     names = []
+    #     for voting_rule in voting_rules:
+    #         names.append(voting_rule["name"])
+    #         r.append(results_data[format_key(voting_rule["name"], sw["name"])])
+    #     violin_plot_rules(
+    #         np.array(r),
+    #         f"Distortion Under {sw['name']} Social Utility",
+    #         "Number of voters",
+    #         "Distortion",
+    #         names,
+    #         show=False,
+    #     )
+    to_plot = [results[format_key("Black's Rule", sw["name"])] for sw in socialwelfare_rules]
+    titles_plot = [sw["name"] for sw in socialwelfare_rules]
+    plot_distortions_multi_fig(
+        distortions=to_plot,
+        titles=titles_plot,
+        main_title="Instance Distortion under Black's Rule",
+        ylabel="Instance Distortion",
+        xlabel="Number of voters",
+        n_vals=n_vals,
+        m_vals=m_vals,
+        show=False
+    )
+    violin_plot_social_welfare(results_data, socialwelfare_rules, voting_rules, "Distribution of Instance Distortion", "Instance Distortion")
 
 
 if __name__ == "__main__":
