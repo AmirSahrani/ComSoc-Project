@@ -8,12 +8,12 @@ from main import format_key, gen_ut_list, gen_vr_list
 
 plt.rcParams.update(
     {
-        "font.size": 16,
-        "axes.labelsize": 14,
-        "axes.titlesize": 14,
-        "xtick.labelsize": 12,
-        "ytick.labelsize": 13,
-        "legend.fontsize": 13,
+        "font.size": 23,
+        "axes.labelsize": 23,
+        "axes.titlesize": 23,
+        "xtick.labelsize": 23,
+        "ytick.labelsize": 23,
+        "legend.fontsize": 16,
         "axes.linewidth": 1,
         "grid.linewidth": 1,
         "grid.alpha": 0.3,
@@ -239,7 +239,7 @@ def violin_plot_social_welfare(
     # Add labels and title
     plt.xticks(ticks=tick_positions, labels=labels, rotation=45, ha="right")
     plt.ylabel(ylabel)
-    plt.ylim((0,10))
+    plt.ylim((1,10))
     plt.title(title)
     plt.grid(axis="y", linestyle="--", alpha=0.6)
 
@@ -310,7 +310,7 @@ def main():
         xlabel="Number of voters",
         n_vals=n_vals,
         m_vals=m_vals,
-        show=False
+        show=True
     )
     violin_plot_social_welfare(results_data, socialwelfare_rules, voting_rules, "Distribution of Instance Distortion", "Instance Distortion")
 
