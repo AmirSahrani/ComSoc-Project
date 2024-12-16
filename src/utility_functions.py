@@ -1,5 +1,14 @@
 import numpy as np
 from pref_voting import generate_utility_profiles as gup
+from pref_voting import generate_profiles as gp
+from pref_voting import voting_methods as vr
+
+
+def anti_plurality(profile):
+    rank = profile._rankings
+    rank = rank[..., ::-1]
+    return vr.plurality(gp.Profile(rank))
+
 
 
 def utilities_to_np(utility_profile: gup.UtilityProfile) -> np.ndarray:
@@ -23,8 +32,8 @@ def nash_optimal(profile):
     """
     Returns the optimal winner, such that the sum of the utilities of the voters is maximized.
     """
-    # profile = utilities_to_np(profile) + np.exp(-6)
-    profile = utilities_to_np(profile)
+    profile = utilities_to_np(profile) + np.exp(-6)
+    # profile = utilities_to_np(profile)
     m = profile.shape[0]
     sw = np.power(profile, 1 / m).prod(axis=0)
     return sw

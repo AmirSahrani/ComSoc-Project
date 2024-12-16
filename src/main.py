@@ -4,12 +4,15 @@ from typing import Callable
 import matplotlib.pyplot as plt
 import numpy as np
 from pref_voting import generate_profiles as gp
+
 from pref_voting import generate_utility_profiles as gup
 from pref_voting import voting_methods as vr
 from pref_voting.iterative_methods import instant_runoff
+from preflibtools.instances.preflibinstance import instance
 from tqdm import tqdm
 
 from utility_functions import (
+    anti_plurality,
     nash_optimal,
     nietzschean_optimal,
     rawlsian_optimal,
@@ -21,8 +24,6 @@ def vr_wrapper(vr_rule):
     def rule(x):
         return vr_rule(x)[0]
     return rule
-
-
 
 
 class VotingGame:
@@ -111,6 +112,7 @@ class VotingGame:
         )
 
     def get_winner(self, profile: gp.Profile) -> int:
+        assert isinstance(profile, gp.Profile)
         winner = self.rule(profile)
         assert winner < self.m, f"winner: {winner}, m: {self.m}"
         return winner
@@ -298,8 +300,10 @@ def gen_vr_list():
     plurality_rule = {"rule": vr.plurality, "name": "Plurality rule"}
     blacks_rule = {"rule": vr.blacks, "name": "Black's Rule"}
     ir_rule = {"rule": instant_runoff, "name": "Instand-runoff voting"}
+    anti_rule = {"rule": anti_plurality, "name": "Anti-Plurality"}
 
-    return [borda_rule, veto_rule, plurality_rule, blacks_rule, ir_rule]
+    return [borda_rule, veto_rule, plurality_rule, blacks_rule, ir_rule, anti_rule]
+    # return [anti_rule]
 
 
 def gen_ut_list():

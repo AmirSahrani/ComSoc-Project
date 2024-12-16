@@ -248,7 +248,7 @@ def violin_plot_social_welfare(
         plt.Line2D([0], [0], color=colors[i], lw=6, label=sw["name"])
         for i, sw in enumerate(socialwelfare_rules)
     ]
-    plt.legend(handles=handles, title="Social Welfare Rules", loc="upper right")
+    plt.legend(handles=handles, title="Social Welfare Rules", loc="upper left")
 
     plt.tight_layout()
 
@@ -300,12 +300,12 @@ def main():
     #         names,
     #         show=False,
     #     )
-    to_plot = [results[format_key("Black's Rule", sw["name"])] for sw in socialwelfare_rules]
+    to_plot = [results[format_key("Anti-Plurality", sw["name"])] for sw in socialwelfare_rules]
     titles_plot = [sw["name"] for sw in socialwelfare_rules]
     plot_distortions_multi_fig(
         distortions=to_plot,
         titles=titles_plot,
-        main_title="Instance Distortion under Black's Rule",
+        main_title="Instance Distortion under the Anti-Plurality Rule",
         ylabel="Instance Distortion",
         xlabel="Number of voters",
         n_vals=n_vals,
