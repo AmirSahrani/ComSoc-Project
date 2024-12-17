@@ -1,14 +1,11 @@
 import pickle
 from typing import Callable
 
-import matplotlib.pyplot as plt
 import numpy as np
 from pref_voting import generate_profiles as gp
-
 from pref_voting import generate_utility_profiles as gup
 from pref_voting import voting_methods as vr
 from pref_voting.iterative_methods import instant_runoff
-from preflibtools.instances.preflibinstance import instance
 from tqdm import tqdm
 
 from utility_functions import (
@@ -23,6 +20,7 @@ from utility_functions import (
 def vr_wrapper(vr_rule):
     def rule(x):
         return vr_rule(x)[0]
+
     return rule
 
 
@@ -248,13 +246,21 @@ def format_key(vr, sw):
     return vr + ", " + sw
 
 
-def sampling_experiment(voting_rules, socialwelfare_rules, n_vals, m_vals, n_trials, k, profile):
+def sampling_experiment(
+    voting_rules, socialwelfare_rules, n_vals, m_vals, n_trials, k, profile
+):
     results = {}
     # np.random.seed(1)
     for voting_rule in tqdm(voting_rules):
         for sw in socialwelfare_rules:
             results[format_key(voting_rule["name"], sw["name"])] = evaluate_rule(
-                vr_wrapper(voting_rule["rule"]), sw["rule"], n_vals, m_vals, n_trials, k,profile
+                vr_wrapper(voting_rule["rule"]),
+                sw["rule"],
+                n_vals,
+                m_vals,
+                n_trials,
+                k,
+                profile,
             )
     return results
 
@@ -309,7 +315,7 @@ def gen_vr_list():
 def gen_ut_list():
     # Utility function to test on each voting rule
     nash_rule = {"rule": nash_optimal, "name": "Nash"}
-    utilitarian_rule = {"rule": utilitarian_optimal, "name": "Utiliratian"}
+    utilitarian_rule = {"rule": utilitarian_optimal, "name": "Utilitarian"}
     rawlsian_rule = {"rule": rawlsian_optimal, "name": "Rawlsian"}
     nietz_rule = {"rule": nietzschean_optimal, "name": "Nietzschean"}
 
@@ -321,17 +327,17 @@ def main():
     np.random.seed(2)
     n_vals = range(2, 100, 5)
     m_vals = range(2, 25, 5)
-    n_trials = 100
+    n_trials = 10
     sample_size = 5000
     k = 15
     voting_rules = gen_vr_list()
     socialwelfare_rules = gen_ut_list()
 
     profile = gp.Profile.from_preflib("data/00014-00000001.soc")
-    results = sampling_experiment(
-        voting_rules, socialwelfare_rules, n_vals, m_vals, n_trials, k, profile
-    )
-    save_data(results, f"results/random_sampling_k_{k}.pkl")
+    # results = sampling_experiment(
+    #     voting_rules, socialwelfare_rules, n_vals, m_vals, n_trials, k, profile
+    # )
+    # save_data(results, f"results/random_sampling_k_{k}.pkl")
 
     results_data = full_data_set_experiment(
         voting_rules,

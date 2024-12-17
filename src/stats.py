@@ -5,55 +5,12 @@ import numpy as np
 import pandas as pd
 import pymc as pm
 
-from main import gen_ut_list, gen_vr_list, save_data
+from main import save_data
 from plotting import load
 
 
 def split(key):
     return key.split(", ")
-
-
-def fit_bayesian_regression(key_data, n_vals, m_vals):
-    """
-    Fit Bayesian regressions to results for each combination of voting rules and utility functions.
-
-    Parameters:
-        results (dict): Dictionary with keys "voting_rule, utility_function" and values as np.array
-                        of shape [N, M, num_trials].
-        n_vals (list or np.array): Array of N values corresponding to the first dimension.
-        m_vals (list or np.array): Array of M values corresponding to the second dimension.
-
-    Returns:
-        dict: A dictionary containing the PyMC traces for each combination of voting_rule and utility_function.
-    """
-    key, data = key_data
-    voting_rule, utility_function = split(key)
-
-    # Flatten the data to align with regression inputs
-    N, M, num_trials = data.shape
-    n_grid, m_grid = np.meshgrid(n_vals, m_vals, indexing="ij")
-
-    n_flat = n_grid.flatten()
-    m_flat = m_grid.flatten()
-    y_flat = data.mean(axis=2).flatten()  # Average over trials
-
-    with pm.Model() as model:
-        # Priors for regression coefficients
-        alpha = pm.Normal("alpha", mu=0, sigma=10)
-        beta_n = pm.Normal("beta_n", mu=0, sigma=10)
-        beta_m = pm.Normal("beta_m", mu=0, sigma=10)
-        sigma = pm.HalfNormal("sigma", sigma=10)
-
-        # Linear regression mean
-        mu = alpha + beta_n * n_flat + beta_m * m_flat
-
-        # Likelihood
-        y_obs = pm.Normal("y_obs", mu=mu, sigma=sigma, observed=y_flat)
-
-        # Sampling
-        trace = pm.sampling.sample(nuts_sampler="numpyro", progressbar=True)
-
-    return (voting_rule, utility_function), trace
 
 
 def fit_parallel(results, func, kwargs, n_processes=None):
@@ -66,46 +23,69 @@ def fit_parallel(results, func, kwargs, n_processes=None):
         worker_func = partial(func, **kwargs)
         results_list = pool.map(worker_func, results.items())
 
-    # Convert results list to dictionary
-    return dict(results_list)
+    # Convert results list to nested dictionary
+    merged_results = {}
+    for result_dict in results_list:
+        for rule, utility_dict in result_dict.items():
+            if rule not in merged_results:
+                merged_results[rule] = {}
+            for utility_function, result in utility_dict.items():
+                merged_results[rule][utility_function] = result
+
+    return merged_results
 
 
-def get_regression_stats(traces):
+def get_correlations(results):
     """
-    Extract regression statistics from PyMC traces.
-
+    Return correlations and credibility intervals on results.
     Parameters:
-        traces (dict): Dictionary of PyMC traces from fit_bayesian_regression
-
+        results (dict): Dictionary with keys as "voting_rule, utility_function" and values as np.array
+                        of shape [N, M, num_trials].
     Returns:
-        dict: Dictionary containing statistics for each voting rule and utility function combination
+        dict: Dictionary containing correlation statistics for each voting rule and utility function combination.
     """
     stats = {}
+    for key, data in results.items():
+        voting_rule, utility_function = key.split(", ")
+        # Flatten the data to align with correlation inputs
+        N, M, num_trials = data.shape
+        n_vals, m_vals = np.meshgrid(range(N), range(M), indexing="ij")
+        n_flat = n_vals.flatten()
+        m_flat = m_vals.flatten()
+        y_flat = data.mean(axis=2).flatten()  # Average over trials
 
-    for (voting_rule, utility_function), trace in traces.items():
-        # Get beta_n statistics
-        beta_n_samples = trace.posterior["beta_n"].values.flatten()
-        beta_n_mean = np.mean(beta_n_samples)
-        beta_n_std = np.std(beta_n_samples)
-        beta_n_ci = np.percentile(beta_n_samples, [0.5, 99.5])  # 99% CI
+        # Calculate correlations
+        ny_correlation = np.corrcoef(n_flat, y_flat)[0, 1]
+        my_correlation = np.corrcoef(m_flat, y_flat)[0, 1]
 
-        # Get beta_m statistics
-        beta_m_samples = trace.posterior["beta_m"].values.flatten()
-        beta_m_mean = np.mean(beta_m_samples)
-        beta_m_std = np.std(beta_m_samples)
-        beta_m_ci = np.percentile(beta_m_samples, [0.5, 99.5])  # 99% CI
+        # Bootstrap confidence intervals
+        n_bootstrap_correlations = []
+        m_bootstrap_correlations = []
+        n_samples = len(y_flat)
 
-        stats[(voting_rule, utility_function)] = {
-            "voting_rule": voting_rule,
-            "utility_function": utility_function,
-            "beta_n_mean": beta_n_mean,
-            "beta_n_std": beta_n_std,
-            "beta_n_ci99": tuple(beta_n_ci),
-            "beta_m_mean": beta_m_mean,
-            "beta_m_std": beta_m_std,
-            "beta_m_ci_99": tuple(beta_m_ci),
+        for _ in range(1000):  # Number of bootstrap iterations
+            indices = np.random.randint(0, n_samples, size=n_samples)
+            n_bootstrap = n_flat[indices]
+            m_bootstrap = m_flat[indices]
+            y_bootstrap = y_flat[indices]
+
+            n_bootstrap_correlations.append(np.corrcoef(n_bootstrap, y_bootstrap)[0, 1])
+            m_bootstrap_correlations.append(np.corrcoef(m_bootstrap, y_bootstrap)[0, 1])
+
+        # Calculate means and confidence intervals
+        ny_correlation_mean = np.mean(n_bootstrap_correlations)
+        my_correlation_mean = np.mean(m_bootstrap_correlations)
+
+        ny_correlation_ci = np.percentile(n_bootstrap_correlations, [0.5, 99.5])
+        my_correlation_ci = np.percentile(m_bootstrap_correlations, [0.5, 99.5])
+
+        # Store results
+        stats.setdefault(voting_rule, {})[utility_function] = {
+            "n_y_correlation_mean": ny_correlation_mean,
+            "n_y_correlation_ci99": ny_correlation_mean - ny_correlation_ci[1],
+            "m_y_correlation_mean": my_correlation_mean,
+            "m_y_correlation_ci99": my_correlation_mean - my_correlation_ci[1],
         }
-
     return stats
 
 
@@ -142,35 +122,31 @@ def mean_estimate(key_data):
 
         # Get posterior predictive samples
         y_obs_samples = posterior_predictive["y_obs"]
-        lower_bound, upper_bound = np.percentile(y_obs_samples, [0.05, 95])
+        lower_bound, upper_bound = np.percentile(y_obs_samples, [0.5, 99.5])
 
-    return (voting_rule, utility_function), {
-        "voting_rule": voting_rule,
-        "utility_function": utility_function,
-        "mean": mean,
-        "std": std,
-        "ci 99%": (
-            lower_bound,
-            upper_bound,
-        ),  # example, refine based on your specific need
+    return {
+        voting_rule: {
+            utility_function: {
+                "mean": mean,
+                "std": std,
+                "ci 99%": (
+                    upper_bound - mean
+                ),  # example, refine based on your specific need
+            }
+        }
     }
 
 
 def main():
     n_vals = range(2, 100, 5)
     m_vals = range(2, 25, 5)
-    voting_rules = gen_vr_list()
-    socialwelfare_rules = gen_ut_list()
 
-    results = load("results/random_sampling_k_10.pkl")
-    results_data = load("results/sushi_data_k_10.pkl")
-    models = fit_parallel(
-        results, fit_bayesian_regression, {"n_vals": n_vals, "m_vals": m_vals}
-    )
-    stats = get_regression_stats(models)
+    results = load("results/random_sampling_k_15.pkl")
+    results_data = load("results/sushi_data_k_15.pkl")
+    stats = get_correlations(results)
     models_means = fit_parallel(results_data, mean_estimate, {})
-    save_data(stats, "results/stats_regression_k_10.pkl")
-    save_data(models_means, "results/stats_means_k_10.pkl")
+    save_data(stats, "results/stats_regression_k_15.pkl")
+    save_data(models_means, "results/stats_means_k_15.pkl")
 
     df = pd.DataFrame(stats)
     print(df.head())

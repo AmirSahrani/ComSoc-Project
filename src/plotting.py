@@ -5,7 +5,6 @@ import numpy as np
 
 from main import format_key, gen_ut_list, gen_vr_list
 
-
 plt.rcParams.update(
     {
         "font.size": 23,
@@ -22,6 +21,7 @@ plt.rcParams.update(
         "font.family": "Computer Modern",
     }
 )
+
 
 def violin_plot_rules(
     distortions: np.ndarray,
@@ -119,6 +119,7 @@ def plot_distortions_multi_fig(
 
             ax.set_title(title)
             ax.set_ylim((0, 8))
+            plt.axhline(1, alpha=0.6, linestyle="dashed")
             ax.grid(True)
             if idx == 3:
                 ax.legend(loc="upper right")
@@ -132,7 +133,6 @@ def plot_distortions_multi_fig(
     for ax in axes[:, 0]:
         ax.set_ylabel(ylabel)
 
-    fig.suptitle(main_title)
     plt.tight_layout()
     fig.savefig(f"figures/multiplot{main_title}.pdf")
 
@@ -200,7 +200,7 @@ def violin_plot_social_welfare(
         ylabel: Y-axis label.
         show: Whether to display the plot.
     """
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(16, 8))
 
     # Generate colors for each social welfare rule
     cmap = plt.get_cmap("viridis")
@@ -238,9 +238,9 @@ def violin_plot_social_welfare(
 
     # Add labels and title
     plt.xticks(ticks=tick_positions, labels=labels, rotation=45, ha="right")
+    plt.axhline(1, alpha=0.6, linestyle="dashed")
     plt.ylabel(ylabel)
-    plt.ylim((1,10))
-    plt.title(title)
+    plt.ylim((0, 10))
     plt.grid(axis="y", linestyle="--", alpha=0.6)
 
     # Add legend for social welfare rules
@@ -258,6 +258,7 @@ def violin_plot_social_welfare(
         plt.show()
     plt.close()
 
+
 def load(filename):
     with open(filename, "rb") as f:
         results = pickle.load(f)
@@ -274,45 +275,41 @@ def main():
     results = load("results/random_sampling_k_15.pkl")
     results_data = load("results/sushi_data_k_15.pkl")
 
-    # for voting_rule in voting_rules:
-    #     for sw in socialwelfare_rules:
-    #         plot_distortions(
-    #             results[format_key(voting_rule["name"], sw["name"])],
-    #             f"Distortion of {voting_rule['name']}, {sw['name']}",
-    #             "Number of voters",
-    #             "Distortion",
-    #             n_vals,
-    #             m_vals,
-    #             show=False,
-    #         )
-
-    # for sw in socialwelfare_rules:
-    #     r = []
-    #     names = []
-    #     for voting_rule in voting_rules:
-    #         names.append(voting_rule["name"])
-    #         r.append(results_data[format_key(voting_rule["name"], sw["name"])])
-    #     violin_plot_rules(
-    #         np.array(r),
-    #         f"Distortion Under {sw['name']} Social Utility",
-    #         "Number of voters",
-    #         "Distortion",
-    #         names,
-    #         show=False,
-    #     )
-    to_plot = [results[format_key("Anti-Plurality", sw["name"])] for sw in socialwelfare_rules]
-    titles_plot = [sw["name"] for sw in socialwelfare_rules]
-    plot_distortions_multi_fig(
-        distortions=to_plot,
-        titles=titles_plot,
-        main_title="Instance Distortion under the Anti-Plurality Rule",
-        ylabel="Instance Distortion",
-        xlabel="Number of voters",
-        n_vals=n_vals,
-        m_vals=m_vals,
-        show=True
+    # to_plot = [
+    #     results[format_key("Anti-Plurality", sw["name"])] for sw in socialwelfare_rules
+    # ]
+    # titles_plot = [sw["name"] for sw in socialwelfare_rules]
+    # plot_distortions_multi_fig(
+    #     distortions=to_plot,
+    #     titles=titles_plot,
+    #     main_title="Instance Distortion under the Anti-Plurality Rule",
+    #     ylabel="Instance Distortion",
+    #     xlabel="Number of voters",
+    #     n_vals=n_vals,
+    #     m_vals=m_vals,
+    #     show=True,
+    # )
+    # to_plot = [
+    #     results[format_key("Black's Rule", sw["name"])] for sw in socialwelfare_rules
+    # ]
+    # titles_plot = [sw["name"] for sw in socialwelfare_rules]
+    # plot_distortions_multi_fig(
+    #     distortions=to_plot,
+    #     titles=titles_plot,
+    #     main_title="Instance Distortion under the Black Rule",
+    #     ylabel="Instance Distortion",
+    #     xlabel="Number of voters",
+    #     n_vals=n_vals,
+    #     m_vals=m_vals,
+    #     show=True,
+    # )
+    violin_plot_social_welfare(
+        results_data,
+        socialwelfare_rules,
+        voting_rules,
+        "Distribution of Instance Distortion",
+        "Instance Distortion",
     )
-    violin_plot_social_welfare(results_data, socialwelfare_rules, voting_rules, "Distribution of Instance Distortion", "Instance Distortion")
 
 
 if __name__ == "__main__":
