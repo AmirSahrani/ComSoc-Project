@@ -117,9 +117,9 @@ def plot_distortions_multi_fig(
                     alpha=0.2,
                 )
 
+            ax.axhline(1, alpha=0.3, linestyle="dashed", color="black")
             ax.set_title(title)
             ax.set_ylim((0, 8))
-            plt.axhline(1, alpha=0.6, linestyle="dashed")
             ax.grid(True)
             if idx == 3:
                 ax.legend(loc="upper right")
@@ -275,41 +275,41 @@ def main():
     results = load("results/random_sampling_k_15.pkl")
     results_data = load("results/sushi_data_k_15.pkl")
 
-    # to_plot = [
-    #     results[format_key("Anti-Plurality", sw["name"])] for sw in socialwelfare_rules
-    # ]
-    # titles_plot = [sw["name"] for sw in socialwelfare_rules]
-    # plot_distortions_multi_fig(
-    #     distortions=to_plot,
-    #     titles=titles_plot,
-    #     main_title="Instance Distortion under the Anti-Plurality Rule",
-    #     ylabel="Instance Distortion",
-    #     xlabel="Number of voters",
-    #     n_vals=n_vals,
-    #     m_vals=m_vals,
-    #     show=True,
-    # )
-    # to_plot = [
-    #     results[format_key("Black's Rule", sw["name"])] for sw in socialwelfare_rules
-    # ]
-    # titles_plot = [sw["name"] for sw in socialwelfare_rules]
-    # plot_distortions_multi_fig(
-    #     distortions=to_plot,
-    #     titles=titles_plot,
-    #     main_title="Instance Distortion under the Black Rule",
-    #     ylabel="Instance Distortion",
-    #     xlabel="Number of voters",
-    #     n_vals=n_vals,
-    #     m_vals=m_vals,
-    #     show=True,
-    # )
-    violin_plot_social_welfare(
-        results_data,
-        socialwelfare_rules,
-        voting_rules,
-        "Distribution of Instance Distortion",
-        "Instance Distortion",
+    to_plot = [
+        results[format_key("Anti-Plurality", sw["name"])] for sw in socialwelfare_rules
+    ]
+    titles_plot = [sw["name"] for sw in socialwelfare_rules]
+    plot_distortions_multi_fig(
+        distortions=to_plot,
+        titles=titles_plot,
+        main_title="Instance Distortion under the Anti-Plurality Rule",
+        ylabel="Instance Distortion",
+        xlabel="Number of voters",
+        n_vals=n_vals,
+        m_vals=m_vals,
+        show=True,
     )
+    to_plot = [
+        results[format_key("Black's Rule", sw["name"])] for sw in socialwelfare_rules
+    ]
+    titles_plot = [sw["name"] for sw in socialwelfare_rules]
+    plot_distortions_multi_fig(
+        distortions=to_plot,
+        titles=titles_plot,
+        main_title="Instance Distortion under the Black Rule",
+        ylabel="Instance Distortion",
+        xlabel="Number of voters",
+        n_vals=n_vals,
+        m_vals=m_vals,
+        show=True,
+    )
+    # violin_plot_social_welfare(
+    #     results_data,
+    #     socialwelfare_rules,
+    #     voting_rules,
+    #     "Distribution of Instance Distortion",
+    #     "Instance Distortion",
+    # )
 
 
 if __name__ == "__main__":
