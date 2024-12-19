@@ -275,6 +275,9 @@ def main():
     results = load("results/random_sampling_k_15.pkl")
     results_data = load("results/sushi_data_k_15.pkl")
 
+    for sw  in socialwelfare_rules:
+        results_data[format_key("Inverse-Plurality", sw["name"])] = results_data[format_key("Anti-Plurality", sw["name"])]
+
     to_plot = [
         results[format_key("Anti-Plurality", sw["name"])] for sw in socialwelfare_rules
     ]
@@ -287,11 +290,13 @@ def main():
         xlabel="Number of voters",
         n_vals=n_vals,
         m_vals=m_vals,
-        show=True,
+        show=False,
     )
+
     to_plot = [
         results[format_key("Black's Rule", sw["name"])] for sw in socialwelfare_rules
     ]
+
     titles_plot = [sw["name"] for sw in socialwelfare_rules]
     plot_distortions_multi_fig(
         distortions=to_plot,
@@ -301,15 +306,15 @@ def main():
         xlabel="Number of voters",
         n_vals=n_vals,
         m_vals=m_vals,
-        show=True,
+        show=False,
     )
-    # violin_plot_social_welfare(
-    #     results_data,
-    #     socialwelfare_rules,
-    #     voting_rules,
-    #     "Distribution of Instance Distortion",
-    #     "Instance Distortion",
-    # )
+    violin_plot_social_welfare(
+        results_data,
+        socialwelfare_rules,
+        voting_rules,
+        "Distribution of Instance Distortion",
+        "Instance Distortion",
+    )
 
 
 if __name__ == "__main__":
